@@ -1,0 +1,35 @@
+personal:
+  state: "CA"
+  zip_code: "90210"
+
+banking:
+  # Banks where you currently have a checking/savings account
+  existing_accounts:
+    - "chase"
+    - "bank of america"
+
+  # Credit cards you currently hold (lowercase)
+  existing_credit_cards:
+    - "chase sapphire preferred"
+    - "amex gold"
+
+  # Banks where you've recently received a bonus (prevents duplicate applications)
+  churning_cooldowns:
+    - bank: "chase"
+      last_bonus_date: "2024-01-15"
+
+  preferences:
+    # Minimum net profit to be worth pursuing (dollars)
+    min_profit_threshold: 100
+    # Maximum number of direct deposits you're willing to set up for a single bonus
+    max_direct_deposit_required: 2
+    willing_to_open_brokerage: true
+    willing_to_do_credit_pull: true
+    willing_to_visit_branch: true
+    # Banks to skip entirely (agent will mark all their offers IRRELEVANT)
+    excluded_banks: []
+    # Free-form facts that don't fit elsewhere; used as last resort
+    additional_context: []
+    # Thresholds for DISCOUNT_MONEYMAKER — both must be met
+    min_discount_pct: 50       # minimum % off
+    min_discount_savings: 25   # minimum $ savings

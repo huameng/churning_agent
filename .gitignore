@@ -1,0 +1,34 @@
+# Secrets and personal config
+.env
+.secrets.env
+config/user_profile.yaml
+
+# Runtime data
+data/
+.venv/
+.adk/
+
+# IDE / tool state
+.claude/
+.pytest_cache/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Eval runtime artifacts (regenerated from cache)
+eval/cases.json
+eval/failures.json
+eval/excluded_urls.json
+eval/results/
+eval/improvement_history.json
+
+# ADK eval set artifacts
+*.evalset.json
+
+# Browser fixture cache (binary, regenerated)
+tests/fixtures/_profile/
+
+# Notes
+FUTURE_WORK.md

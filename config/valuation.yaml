@@ -1,0 +1,7 @@
+# Conversion of reward units to USD. Used to value non-cash rewards consistently.
+# Edit as your own valuation changes (e.g. if travel points become worth more).
+units:
+  USD: 1.0
+  GBP: 1.27      # TopCashback is UK-centric; some rewards are in £
+  SB: 0.01       # Swagbucks point
+  MR: 0.012      # Amex Membership Rewards (rough cash-equiv floor)
