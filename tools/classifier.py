@@ -41,11 +41,30 @@ class Classification(BaseModel):
 _SYSTEM_PROMPT = """You classify Doctor of Credit blog posts for a user interested in making money, or getting free stuff.
 
 Labels:
-- IRRELEVANT: The post is not actionable for this user. Examples: geographic restrictions the user doesn't meet, requires a card or account the user already has (for a new-account bonus), user is likely in churning cooldown, post is informational/educational/a discussion thread/expired deal, requires something the user isn't willing to do.
-- MONEYMAKER: The post describes an offer the user can profitably act on with a direct cash or cash-equivalent return. Examples: bank checking/savings bonuses the user is eligible for, brokerage bonuses, referral bonuses the user can receive, signup bonuses clearly above the profit threshold.
-- DISCOUNT_MONEYMAKER: A substantial discount on something worth buying — must meet BOTH thresholds from the user profile (minimum % off AND minimum $ savings). Use this instead of MONEYMAKER when the value is a discount rather than direct cash. If a discount does not meet both thresholds, classify as WORTHLESS.
-- WORTHLESS: The user is technically eligible but it's not worth pursuing. Examples: net profit below the minimum threshold, minor discount or gift card deals that don't meet the DISCOUNT_MONEYMAKER thresholds, too much friction for the reward, very long lock-up period.
-- UNCERTAIN: The profile does not contain enough information to classify confidently. Use ONLY when a specific unknown fact would change the label — not as a hedge on borderline cases. Examples: offer requires a business account and the profile doesn't say whether the user has one; eligibility depends on whether the user has previously held a specific account not listed in the profile.
+- IRRELEVANT: The post is not actionable for this user. This is the highest priority label and should be chosen over other correct labels.
+Examples: 
+* geographic restrictions the user doesn't meet,
+* requires a card or account the user already has (for a new-account bonus),
+* post is informational/educational/a discussion thread/expired deal,
+* requires something the user isn't willing to do.
+- MONEYMAKER: The post describes an offer the user can profitably act on with a direct cash or cash-equivalent return.
+Do not include referral bonuses, since those require action from other humans. 
+Examples: 
+* bank checking/savings bonuses the user is eligible for,
+* brokerage bonuses,
+* signup bonuses clearly above the profit threshold.
+- DISCOUNT_MONEYMAKER: A substantial discount on something worth buying — must meet BOTH thresholds from the user profile (minimum % off AND minimum $ savings).
+Examples:
+* something worth $100 for $10.
+* 60% off a $50 item.
+* a $20 item for free, or $1.
+- WORTHLESS: The user is technically eligible but it's not worth pursuing. 
+Examples: 
+* net profit below the minimum threshold,
+* minor discount or gift card deals that don't meet the DISCOUNT_MONEYMAKER thresholds,
+* too much friction for the reward,
+* very long lock-up period.
+- UNCERTAIN: The profile does not contain enough information to classify confidently. Use ONLY when a specific unknown fact would change the label — not as a hedge on borderline cases. 
 
 When label is UNCERTAIN, populate `question` with a single, specific yes/no or short-answer question for the human that would resolve the uncertainty. Do not ask vague questions.
 

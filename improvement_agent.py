@@ -6,6 +6,8 @@ Exposed as AgentTool to the root agent so the user can say
 """
 
 import json
+from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -14,7 +16,7 @@ from google.adk.agents import LlmAgent
 from google.genai import types
 
 import churning_agent.tools.classifier as _clf_module
-from churning_agent.eval.eval_classifier import evaluate_samples
+from churning_agent.eval.eval_classifier import evaluate_samples, _RESULTS_DIR
 from churning_agent.eval.improve_classifier import (
     MIN_HOLDOUT_F1,
     SPLIT_SEED,
@@ -30,7 +32,32 @@ from churning_agent.eval.improve_classifier import (
 
 load_dotenv(Path(__file__).parent / ".env")
 
-_MODEL = "gemini-2.5-flash"
+_MODEL = "gemini-3.1-flash-lite"
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _write_split_result(split: str, n_cases: int, metrics: dict, failures: list) -> Path:
+    """Write a timestamped result file to eval/results/ so the user has a record."""
+    _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    run_at = datetime.utcnow().isoformat()
+    filename = run_at.replace(":", "").replace("-", "").replace("T", "_")[:15] + f"_{split}.json"
+    path = _RESULTS_DIR / filename
+    path.write_text(
+        json.dumps({
+            "run_at": run_at,
+            "split": split,
+            "n_cases": n_cases,
+            "macro_f1": round(macro_f1(metrics), 4),
+            "per_label_f1": {label: round(m["f1"], 4) for label, m in metrics.items()},
+            "failure_count": len(failures),
+            "failures": failures,
+        }, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return path
 
 
 # ---------------------------------------------------------------------------
@@ -40,59 +67,74 @@ _MODEL = "gemini-2.5-flash"
 def run_eval() -> dict:
     """
     Run the classifier against all eval cases.
-    Returns macro F1, per-label F1, total cases, failure count, and a list of failures
-    (title, expected, got, model_reasoning, human_reasoning).
+    Writes a timestamped result file to eval/results/.
+    Returns macro F1, per-label F1, total cases, failure count, and failures.
     """
-    cases = json.loads(_CASES_PATH.read_text(encoding="utf-8"))
-    metrics, failures = evaluate_samples(cases)
+    all_cases = json.loads(_CASES_PATH.read_text(encoding="utf-8"))
+    content_by_url = {c["url"]: c.get("content", "") for c in all_cases}
+
+    metrics, failures = evaluate_samples(all_cases)
+    enriched = [
+        {
+            "title": f["title"],
+            "url": f.get("url"),
+            "expected": f["expected"],
+            "got": f["got"],
+            "model_reasoning": f["model_reasoning"],
+            "human_reasoning": f.get("human_reasoning"),
+            "content_snippet": content_by_url.get(f.get("url"), "")[:300],
+        }
+        for f in failures
+    ]
+    path = _write_split_result("all", len(all_cases), metrics, enriched)
     return {
         "macro_f1": round(macro_f1(metrics), 4),
-        "total_cases": len(cases),
+        "total_cases": len(all_cases),
         "failure_count": len(failures),
         "per_label_f1": {label: round(m["f1"], 4) for label, m in metrics.items()},
-        "failures": [
-            {
-                "title": f["title"],
-                "expected": f["expected"],
-                "got": f["got"],
-                "model_reasoning": f["model_reasoning"],
-                "human_reasoning": f.get("human_reasoning"),
-            }
-            for f in failures
-        ],
+        "result_file": str(path),
+        "failures": enriched,
     }
 
 
 def run_eval_split(split: str) -> dict:
     """
     Run eval on a named split of the eval cases.
+    Writes a timestamped result file to eval/results/.
 
     Args:
         split: "train" or "holdout" (80/20 stratified split, seed=42)
 
-    Returns macro F1, per-label F1, case count, and failures for that split.
+    Returns macro F1, per-label F1, case count, result file path, and failures.
+    Each failure includes a content_snippet (first 300 chars of the offer section).
     """
     all_cases = json.loads(_CASES_PATH.read_text(encoding="utf-8"))
     train, holdout = stratified_split(all_cases, frac=TRAIN_FRAC, seed=SPLIT_SEED)
     cases = train if split == "train" else holdout
+    content_by_url = {c["url"]: c.get("content", "") for c in cases}
 
     metrics, failures = evaluate_samples(cases)
+    enriched = [
+        {
+            "title": f["title"],
+            "url": f.get("url"),
+            "expected": f["expected"],
+            "got": f["got"],
+            "model_reasoning": f["model_reasoning"],
+            "human_reasoning": f.get("human_reasoning"),
+            "content_snippet": content_by_url.get(f.get("url"), "")[:300],
+        }
+        for f in failures
+    ]
+    path = _write_split_result(split, len(cases), metrics, enriched)
     return {
         "split": split,
         "n_cases": len(cases),
         "macro_f1": round(macro_f1(metrics), 4),
         "per_label_f1": {label: round(m["f1"], 4) for label, m in metrics.items()},
         "failure_count": len(failures),
-        "failures": [
-            {
-                "title": f["title"],
-                "expected": f["expected"],
-                "got": f["got"],
-                "model_reasoning": f["model_reasoning"],
-                "human_reasoning": f.get("human_reasoning"),
-            }
-            for f in failures
-        ],
+        "result_file": str(path),
+        "failures": enriched,
     }
 
 
@@ -124,31 +166,46 @@ def save_classifier_prompt() -> str:
 
 def propose_prompt_improvement(failures: list) -> dict:
     """
-    Ask Gemini to propose a targeted improvement to the classifier prompt based on failures.
-    Only sees titles and model/human reasonings — never the full post content.
+    Ask Gemini to propose an improvement to the classifier prompt based on failures.
+    Receives titles, model/human reasonings, AND a content snippet for each failure.
 
     Args:
-        failures: List of failure dicts with keys:
-            title, expected, got, model_reasoning, human_reasoning (may be null).
-            Pass the failures list directly from run_eval_split.
+        failures: List of failure dicts from run_eval_split, including content_snippet.
 
     Returns a dict with:
         - new_prompt: the full replacement prompt text
         - what_changed: a short description of the specific change made
         - why: explanation of the failure pattern that motivated the change
     """
+    # Group failures by (expected → got) to surface patterns
+    by_type: dict[str, list] = defaultdict(list)
+    for f in failures:
+        key = f"{f['expected']} → {f['got']}"
+        by_type[key].append(f)
 
-    def _fmt(f: dict) -> str:
-        line = (
-            f"- Expected {f['expected']}, got {f['got']}: \"{f['title']}\"\n"
-            f"  Model's reasoning: {f['model_reasoning']}"
-        )
-        if f.get("human_reasoning"):
-            line += f"\n  Human explanation: {f['human_reasoning']}"
-        return line
+    unannotated = [f for f in failures if not f.get("human_reasoning")]
 
-    failure_lines = "\n".join(_fmt(f) for f in failures)
+    sections = []
+    for key, cases in sorted(by_type.items(), key=lambda x: -len(x[1])):
+        sections.append(f"\n### {key} ({len(cases)} failure(s)):")
+        for f in cases:
+            entry = f'- Title: "{f["title"]}"'
+            if f.get("content_snippet"):
+                entry += f'\n  Offer text: {f["content_snippet"]}'
+            entry += f'\n  Model reasoning: {f["model_reasoning"]}'
+            if f.get("human_reasoning"):
+                entry += f'\n  Human note: {f["human_reasoning"]}'
+            sections.append(entry)
+
+    failure_block = "\n".join(sections)
     current_prompt = _clf_module._SYSTEM_PROMPT
+
+    annotation_note = ""
+    if unannotated:
+        annotation_note = (
+            f"\nNote: {len(unannotated)} of {len(failures)} failures have no human annotation. "
+            "Infer the correct rule from the offer text and model reasoning.\n"
+        )
 
     meta_prompt = f"""You are improving a classifier system prompt. The classifier assigns one of five
 labels (IRRELEVANT, MONEYMAKER, DISCOUNT_MONEYMAKER, WORTHLESS, UNCERTAIN) to Doctor of Credit blog posts.
@@ -158,24 +215,24 @@ Current system prompt:
 {current_prompt}
 ---
 
-The classifier made the following mistakes on the training set.
-You are shown only the post title and the model's own reasoning — not the full content.
-Human explanations are provided where available and are high-signal.
-
+The classifier made the following mistakes on the training set, grouped by mistake type.
+Each entry includes the post title, a snippet of the actual offer text, the model's reasoning,
+and a human annotation where available (human annotations are high-signal — prioritise them).
+{annotation_note}
 Failures:
-{failure_lines}
+{failure_block}
 
-Task: Propose ONE targeted improvement to the label definitions or classification criteria
+Task: Propose a targeted improvement to the label definitions or classification criteria
 that would fix the most failures above. Your change must:
 - Modify the label definitions or decision criteria only
-- NOT add specific post titles or content as examples
+- NOT add specific post titles or examples from the failures above
 - NOT change the JSON output format description
-- Be minimal — change as few words as possible while fixing the pattern
+- Make whatever scope of change is needed — rewrite a definition entirely if that's what it takes
 
 Respond with a JSON object with three fields:
-- "new_prompt": the complete updated system prompt text (everything that would go between the triple quotes)
-- "what_changed": one sentence describing exactly what you changed (e.g. "Added 'card-not-held offers' to IRRELEVANT examples")
-- "why": one or two sentences explaining the failure pattern you observed and why this change addresses it"""
+- "new_prompt": the complete updated system prompt text
+- "what_changed": one sentence describing exactly what you changed
+- "why": 2-3 sentences explaining the failure pattern and why this change fixes it"""
 
     client = genai.Client()
     response = client.models.generate_content(
@@ -206,7 +263,7 @@ def record_improvement_attempt(
 ) -> str:
     """
     Append a record of an improvement attempt to improvement_history.json.
-    Call this after each accept or reject decision.
+    Call this after every accept or reject decision — never skip this.
 
     Args:
         iteration: Which iteration number this is (1-based)
@@ -218,7 +275,6 @@ def record_improvement_attempt(
         prompt_before: The prompt text before the change
         prompt_after: The proposed prompt text
     """
-    from datetime import datetime
     history = _load_history()
     history.append({
         "iteration": iteration,
@@ -238,16 +294,7 @@ def record_improvement_attempt(
 def get_improvement_history() -> dict:
     """
     Return the full improvement history — all past attempts, accepted or rejected.
-    Use this to answer questions like 'did the improvement agent run?' or
-    'what changed last time?'
-
-    Returns a dict with:
-        - total_attempts: how many iterations have been recorded
-        - accepted: how many were accepted
-        - entries: list of all records (newest first), each with
-            iteration, timestamp, train_f1_before, train_f1_after,
-            holdout_f1_after, accepted, reason
-          (prompt text is omitted to keep the response concise)
+    Use this to answer 'did the improvement agent run?' or 'what changed last time?'
     """
     history = _load_history()
     entries = [
@@ -280,62 +327,114 @@ improvement_agent = LlmAgent(
     description="Runs classifier evals and iteratively improves the classifier system prompt.",
     instruction=f"""You improve the DoC classifier by running evals and proposing targeted prompt changes.
 
-When asked about past runs or improvement history, call get_improvement_history() and summarise the results — how many attempts, how many accepted, and what the F1 trajectory looked like.
+When asked about past runs or improvement history, call get_improvement_history() and summarise results.
 
-When asked to run evals and improve (up to 5 iterations), follow this loop and narrate every step clearly to the user:
+When asked to run evals and improve, execute this loop (up to 5 iterations). You MUST narrate every
+step in detail — do not skip output between tool calls.
+
+---
 
 **Step 1 — Baseline**
 Call run_eval_split("train") and run_eval_split("holdout") in parallel.
-Then tell the user:
-  "📊 Baseline — Train macro-F1: X.XXX (N failures) | Holdout macro-F1: X.XXX"
-  List each failure as: "  • [Expected → Got] Title"
+
+Output IMMEDIATELY (before any further tool calls):
+```
+📊 Baseline
+  Train macro-F1:   X.XXX  (N failures / M cases)
+  Holdout macro-F1: X.XXX  (N failures / M cases)
+  Result files: <path>
+
+Failures on train:
+  • EXPECTED → GOT  "Title"
+    Offer: <first 100 chars of content_snippet>
+  (list every failure)
+
+Unannotated failures (no human_reasoning): N
+```
+
 Save the original prompt via get_classifier_prompt().
 
+---
+
 **Step 2 — Check for failures**
-If train failures = 0, tell the user the classifier is already perfect on the training set and stop.
+If train failures = 0: report the classifier is already clean and stop.
+
+---
 
 **Step 3 — Propose a change**
-Call propose_prompt_improvement with the full failures list from the train split.
-Then tell the user:
-  "💡 Proposed change: <what_changed from the result>"
-  "   Why: <why from the result>"
-  Show a brief before/after of the specific lines that changed in the prompt.
+Call propose_prompt_improvement with the full failures list from the train result.
+
+Output IMMEDIATELY:
+```
+💡 Proposed change
+  What changed: <what_changed>
+  Why: <why>
+
+  Prompt diff (changed lines only):
+  - <old line(s)>
+  + <new line(s)>
+```
+
+---
 
 **Step 4 — Test the change**
-Call set_classifier_prompt with new_prompt from the proposal result.
+Call set_classifier_prompt(new_prompt from the proposal).
 Call run_eval_split("train") and run_eval_split("holdout") in parallel.
-Then tell the user:
-  "🧪 Testing — Train macro-F1: X.XXX → X.XXX (+/-0.XXX) | Holdout: X.XXX"
+
+Output IMMEDIATELY:
+```
+🧪 Test results
+  Train:   X.XXX → X.XXX  (delta: +/-0.XXX)
+  Holdout: X.XXX → X.XXX  (delta: +/-0.XXX)
+```
+
+---
 
 **Step 5 — Accept or reject**
-ACCEPT if: train macro-F1 improved by > 0.002 AND holdout macro-F1 >= {MIN_HOLDOUT_F1}
-REJECT otherwise.
+
+Acceptance rule:
+  ACCEPT if train macro-F1 improved (>= 0, i.e. did not get worse) AND holdout macro-F1 >= {MIN_HOLDOUT_F1}
+  REJECT if train got worse OR holdout dropped below {MIN_HOLDOUT_F1}
+
+Always call record_improvement_attempt regardless of outcome.
 
 On ACCEPT:
   Call save_classifier_prompt().
-  Call record_improvement_attempt with accepted=True.
-  Tell the user: "✅ Accepted — prompt saved."
+  Output: "✅ Accepted and saved."
 
-On REJECT (overfit):
+On REJECT — overfit risk:
   Call set_classifier_prompt(original_prompt) to revert.
-  Call record_improvement_attempt with accepted=False.
-  Tell the user: "❌ Rejected — holdout F1 dropped to X.XXX (floor is {MIN_HOLDOUT_F1}), reverting."
+  Output: "❌ Rejected — holdout dropped to X.XXX (floor {MIN_HOLDOUT_F1}). Reverted."
 
-On REJECT (plateau):
+On REJECT — train got worse:
   Call set_classifier_prompt(original_prompt) to revert.
-  Call record_improvement_attempt with accepted=False.
-  Tell the user: "⏹ Stopped — improvement too small (+X.XXX), plateau reached."
+  Output: "❌ Rejected — train F1 fell by X.XXX. Reverted."
+
+---
 
 **Step 6 — Loop or stop**
-- If accepted: loop back to Step 1 for the next iteration (update "original prompt" to the saved one).
-- If rejected for any reason: stop.
-- Stop after 5 accepted iterations regardless.
+If accepted: loop back to Step 1 (update "original prompt" to the new one).
+If rejected: stop.
+Stop after 5 accepted iterations regardless.
 
-**Final report** (always give this at the end)
-  "📈 Done — X iteration(s) accepted."
-  "   Train:   X.XXX → X.XXX"
-  "   Holdout: X.XXX → X.XXX"
-  Bullet list of every accepted change with its what_changed description.
+---
+
+**Final report** (always give this, even after a single rejected attempt)
+```
+📈 Summary
+  Iterations run: N  |  Accepted: N
+  Train:   X.XXX → X.XXX
+  Holdout: X.XXX → X.XXX
+
+Changes accepted:
+  1. <what_changed>
+
+Changes rejected:
+  1. <what_changed> — <reason>
+```
+
+If there are failures with no human_reasoning, end with:
+"⚠ N failure(s) have no human annotation. Add notes in the case manager for better-targeted improvements."
 """,
     tools=[
         run_eval,
