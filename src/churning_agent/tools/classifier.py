@@ -10,15 +10,14 @@ from typing import Literal
 
 from dotenv import load_dotenv
 from google import genai
-from google.genai import errors as genai_errors
 from google.genai import types
 from pydantic import BaseModel
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from .profile import load_profile
 from .scraper import fetch_offer_section
 from . import store
 from churning_agent import prompts
+from churning_agent.llm import retry_transient
 from churning_agent._paths import PROJECT_ROOT
 
 load_dotenv(PROJECT_ROOT / ".env")
@@ -44,12 +43,7 @@ class Classification(BaseModel):
 _PROMPT = "post_classifier"
 
 
-@retry(
-    retry=retry_if_exception_type(genai_errors.ServerError),
-    wait=wait_exponential(multiplier=2, min=4, max=60),
-    stop=stop_after_attempt(5),
-    reraise=True,
-)
+@retry_transient
 def classify(title: str, content: str) -> Classification:
     """
     Classify a DoC post. This is the testable core — no ADK dependency.

@@ -2,6 +2,7 @@ from google.adk.agents import LlmAgent
 from google.adk.tools.agent_tool import AgentTool
 
 from . import prompts
+from .llm import retrying_model
 from .tools.classifier import fetch_and_classify
 from .tools.notify import notify_moneymaker
 from .tools.scraper import fetch_posts
@@ -17,7 +18,7 @@ from .improvement_agent import improvement_agent
 # rather than pausing for the human itself. Model + instruction: config/prompts/.
 _doc = prompts.load("doc_agent")
 doc_agent = LlmAgent(
-    model=_doc.model,
+    model=retrying_model(_doc.model),
     name="doc_agent",
     description="Finds new MONEYMAKER opportunities on Doctor of Credit.",
     instruction=_doc.system,
@@ -37,7 +38,7 @@ doc_agent = LlmAgent(
 # human, and handles the human-facing parts (questions, profile updates).
 _orch = prompts.load("orchestrator")
 root_agent = LlmAgent(
-    model=_orch.model,
+    model=retrying_model(_orch.model),
     name="churning_agent",
     description="Orchestrates money-making opportunity discovery across Doctor of Credit, TopCashback, and Swagbucks.",
     instruction=_orch.system,

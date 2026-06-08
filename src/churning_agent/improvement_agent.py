@@ -16,6 +16,7 @@ from google.adk.agents import LlmAgent
 from google.genai import types
 
 from churning_agent import prompts
+from churning_agent.llm import retry_transient, retrying_model
 from churning_agent.eval.eval_classifier import evaluate_samples, _RESULTS_DIR
 from churning_agent.eval.improve_classifier import (
     MIN_HOLDOUT_F1,
@@ -150,6 +151,20 @@ def save_classifier_prompt() -> str:
     return "Prompt saved to config/prompts/post_classifier.yaml."
 
 
+@retry_transient
+def _propose(meta_prompt: str, model: str, thinking_budget: int | None) -> str:
+    """The improver's model call, retried through transient transport/server errors."""
+    response = genai.Client().models.generate_content(
+        model=model,
+        contents=meta_prompt,
+        config=types.GenerateContentConfig(
+            thinking_config=types.ThinkingConfig(thinking_budget=thinking_budget),
+            response_mime_type="application/json",
+        ),
+    )
+    return response.text
+
+
 def propose_prompt_improvement(failures: list) -> dict:
     """
     Ask Gemini to propose an improvement to the classifier prompt based on failures.
@@ -211,16 +226,7 @@ Failures:
 
 {cfg.system}"""
 
-    client = genai.Client()
-    response = client.models.generate_content(
-        model=cfg.model,
-        contents=meta_prompt,
-        config=types.GenerateContentConfig(
-            thinking_config=types.ThinkingConfig(thinking_budget=cfg.thinking_budget),
-            response_mime_type="application/json",
-        ),
-    )
-    result = json.loads(response.text)
+    result = json.loads(_propose(meta_prompt, cfg.model, cfg.thinking_budget))
     return {
         "new_prompt": result["new_prompt"],
         "what_changed": result.get("what_changed", ""),
@@ -300,7 +306,7 @@ def get_improvement_history() -> dict:
 
 _AGENT = prompts.load("improvement_agent")
 improvement_agent = LlmAgent(
-    model=_AGENT.model,
+    model=retrying_model(_AGENT.model),
     name="improvement_agent",
     description="Runs classifier evals and iteratively improves the classifier system prompt.",
     instruction=_AGENT.system.replace("{min_holdout_f1}", str(MIN_HOLDOUT_F1)),

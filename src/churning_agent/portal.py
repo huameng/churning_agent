@@ -27,6 +27,7 @@ from churning_agent.tools.portal_tools import (
 )
 from churning_agent.tools.profile import update_profile
 from churning_agent import prompts
+from churning_agent.llm import retrying_model
 
 # Model + instructions live in config/prompts/ (portal_agent + the orchestrated
 # protocol fragment appended to per-site agents).
@@ -44,7 +45,7 @@ _PORTAL_TOOLS = [
 
 # General portal agent (handles any whitelisted site) — for standalone use.
 portal_agent = LlmAgent(
-    model=_MODEL,
+    model=retrying_model(_MODEL),
     name="portal_agent",
     description="Logs into whitelisted rewards portals (TopCashback, Swagbucks) and finds MONEYMAKER offers.",
     instruction=_INSTRUCTION,
@@ -56,7 +57,7 @@ portal_agent = LlmAgent(
 # (the orchestrator relays questions to the human) rather than pausing itself.
 def _site_agent(site: str) -> LlmAgent:
     return LlmAgent(
-        model=_MODEL,
+        model=retrying_model(_MODEL),
         name=f"{site}_agent",
         description=f"Finds new MONEYMAKER offers on {site}.",
         instruction=(_INSTRUCTION + f"\n\nIMPORTANT: You handle ONLY {site}. Ignore other sites."

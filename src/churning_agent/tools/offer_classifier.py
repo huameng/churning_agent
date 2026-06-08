@@ -21,6 +21,7 @@ from . import valuation
 from .classifier import _get_client
 from .profile import UserProfile, load_profile
 from churning_agent import prompts
+from churning_agent.llm import retry_transient
 
 # Model id and system prompt live in config/prompts/offer_classifier.yaml.
 _PROMPT = "offer_classifier"
@@ -54,6 +55,7 @@ Offer:
 Classify this offer."""
 
 
+@retry_transient
 def classify_offer(offer: PortalOffer, profile: UserProfile | None = None) -> OfferDecision:
     """Classify a single portal offer. Testable core — no ADK dependency."""
     profile = profile or load_profile()
