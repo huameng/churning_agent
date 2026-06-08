@@ -27,8 +27,8 @@ eval/improvement_history.json
 # ADK eval set artifacts
 *.evalset.json
 
-# Browser fixture cache (binary, regenerated)
-tests/fixtures/_profile/
+# Test fixtures (scraped/cached HTML, browser profile)
+tests/fixtures/
 
 # Notes
 FUTURE_WORK.md
