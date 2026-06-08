@@ -5,28 +5,27 @@ Reads every entry in data/post_cache/, looks up titles from the classifications 
 (falls back to formatting the URL slug), runs classify() on each, and writes
 eval/cases.json with the current label as `expected`.
 
-Run from workspace/:
+Run from churning_agent/:
     uv run python -m churning_agent.eval.generate_cases
 """
 
 import json
 import sqlite3
-import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from rich.console import Console
 from rich.progress import track
 
 from churning_agent.tools.classifier import classify
 from churning_agent.tools.scraper import _CACHE_DIR
+from churning_agent._paths import DATA_DIR, PROJECT_ROOT
 
 console = Console()
 
-_DB_PATH = Path(__file__).parent.parent / "data" / "classifications.db"
-_OUT_PATH = Path(__file__).parent / "cases.json"
-_EXCLUDED_PATH = Path(__file__).parent / "excluded_urls.json"
+_EVAL_DIR = PROJECT_ROOT / "eval"
+_DB_PATH = DATA_DIR / "classifications.db"
+_OUT_PATH = _EVAL_DIR / "cases.json"
+_EXCLUDED_PATH = _EVAL_DIR / "excluded_urls.json"
 
 
 def _title_from_url(url: str) -> str:

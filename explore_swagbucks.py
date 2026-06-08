@@ -7,10 +7,6 @@ rewards, so we can teach the agent to parse the many offer types.
 """
 
 import asyncio
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from churning_agent.tools.browser import close_session, get_session
 from churning_agent.tools.portal_tools import portal_login

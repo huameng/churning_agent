@@ -30,7 +30,8 @@ from churning_agent.eval.improve_classifier import (
     _save_history,
 )
 
-load_dotenv(Path(__file__).parent / ".env")
+from churning_agent._paths import PROJECT_ROOT
+load_dotenv(PROJECT_ROOT / ".env")
 
 _MODEL = "gemini-3.1-flash-lite"
 

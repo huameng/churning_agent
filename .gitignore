@@ -17,7 +17,7 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Eval runtime artifacts (regenerated from cache)
+# Eval runtime artifacts (regenerated from cache, live at eval/ in project root)
 eval/cases.json
 eval/failures.json
 eval/excluded_urls.json

@@ -20,7 +20,8 @@ from pydantic import BaseModel
 
 from . import sites
 
-_PROFILE_DIR = Path(__file__).parent.parent / "data" / "browser_profile"
+from churning_agent._paths import DATA_DIR
+_PROFILE_DIR = DATA_DIR / "browser_profile"
 _TEXT_LIMIT = 3000
 
 # JS run on each observe(): tag every visible interactive element with a stable

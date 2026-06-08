@@ -11,7 +11,9 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-_DB_PATH = Path(__file__).parent.parent / "data" / "seen_offers.db"
+from churning_agent._paths import DATA_DIR
+
+_DB_PATH = DATA_DIR / "seen_offers.db"
 
 
 def _now() -> str:

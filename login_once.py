@@ -9,9 +9,6 @@ authenticated cookies then persist and future agent runs skip the login page.
 
 import asyncio
 import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from churning_agent.tools.browser import BrowserSession, close_session
 from churning_agent.tools.sites import REGISTRY

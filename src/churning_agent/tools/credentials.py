@@ -14,7 +14,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-_SECRETS_PATH = Path(__file__).parent.parent / ".secrets.env"
+from churning_agent._paths import PROJECT_ROOT
+
+_SECRETS_PATH = PROJECT_ROOT / ".secrets.env"
 _loaded = False
 
 

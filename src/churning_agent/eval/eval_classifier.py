@@ -7,7 +7,7 @@ Cases come from two sources:
      time, making this a regression suite. Edit any `expected` value you disagree with.
   2. SAMPLES below — hand-crafted edge cases that test specific behaviours.
 
-Run from workspace/:
+Run from churning_agent/:
     uv run python -m churning_agent.eval.eval_classifier
     uv run python -m churning_agent.eval.eval_classifier --strict   # exit 1 on first wrong label
     uv run python -m churning_agent.eval.eval_classifier --manual-only  # skip cases.json
@@ -15,12 +15,8 @@ Run from workspace/:
 
 import argparse
 import json
-import sys
 from datetime import datetime
 from pathlib import Path
-
-# Allow running from workspace/churning_agent/ as well as workspace/
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from rich.console import Console
 from rich.table import Table
@@ -29,8 +25,11 @@ from churning_agent.tools.classifier import classify
 
 console = Console()
 
-_CASES_PATH = Path(__file__).parent / "cases.json"
-_RESULTS_DIR = Path(__file__).parent / "results"
+from churning_agent._paths import PROJECT_ROOT
+
+_EVAL_DIR = PROJECT_ROOT / "eval"
+_CASES_PATH = _EVAL_DIR / "cases.json"
+_RESULTS_DIR = _EVAL_DIR / "results"
 
 SAMPLES: list[dict] = []
 

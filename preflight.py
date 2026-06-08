@@ -1,13 +1,11 @@
 """
 Preflight check — run this before starting the agent to catch issues early.
-Run from workspace/: python churning_agent/preflight.py
+Run from churning_agent/: uv run python preflight.py
 """
 import asyncio
 import sys
 import os
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 errors = []
 warnings = []
@@ -42,7 +40,8 @@ except Exception as e:
 # ── 2. Environment ────────────────────────────────────────────────────────────
 print("\n2. Environment")
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).parent / ".env")
+from churning_agent._paths import PROJECT_ROOT
+load_dotenv(PROJECT_ROOT / ".env")
 
 api_key = os.environ.get("GOOGLE_API_KEY", "")
 if api_key and not api_key.startswith("your_"):
@@ -53,7 +52,7 @@ else:
 
 # ── 3. User profile ───────────────────────────────────────────────────────────
 print("\n3. User profile")
-profile_path = Path(__file__).parent / "config" / "user_profile.yaml"
+profile_path = PROJECT_ROOT / "config" / "user_profile.yaml"
 if not profile_path.exists():
     fail(f"config/user_profile.yaml not found — copy config/user_profile.example.yaml and fill it in")
 else:

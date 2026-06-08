@@ -9,7 +9,9 @@ from pathlib import Path
 
 import yaml
 
-_CONFIG_PATH = Path(__file__).parent.parent / "config" / "valuation.yaml"
+from churning_agent._paths import CONFIG_DIR
+
+_CONFIG_PATH = CONFIG_DIR / "valuation.yaml"
 _units: dict[str, float] | None = None
 
 

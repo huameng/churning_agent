@@ -7,9 +7,6 @@ nav/offer link scheme so we can fill in / correct its SiteAdapter. Site-agnostic
 
 import asyncio
 import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from churning_agent.tools.browser import close_session, get_session
 from churning_agent.tools.sites import REGISTRY

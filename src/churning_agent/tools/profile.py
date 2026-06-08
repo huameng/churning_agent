@@ -4,7 +4,9 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel
 
-_CONFIG_PATH = Path(__file__).parent.parent / "config" / "user_profile.yaml"
+from churning_agent._paths import CONFIG_DIR
+
+_CONFIG_PATH = CONFIG_DIR / "user_profile.yaml"
 
 
 class ChurningCooldown(BaseModel):

@@ -1,21 +1,21 @@
 """
 Web UI for managing eval/cases.json.
 
-Run from workspace/:
+Run from churning_agent/:
     uv run python -m churning_agent.eval.case_manager
 Then open http://localhost:5000
 """
 
 import json
-import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from flask import Flask, jsonify, redirect, render_template_string, request, url_for
 
-_CASES_PATH = Path(__file__).parent / "cases.json"
-_FAILURES_PATH = Path(__file__).parent / "failures.json"
+from churning_agent._paths import PROJECT_ROOT
+
+_EVAL_DIR = PROJECT_ROOT / "eval"
+_CASES_PATH = _EVAL_DIR / "cases.json"
+_FAILURES_PATH = _EVAL_DIR / "failures.json"
 
 LABELS = ["IRRELEVANT", "MONEYMAKER", "DISCOUNT_MONEYMAKER", "WORTHLESS", "UNCERTAIN"]
 LABEL_COLOR = {

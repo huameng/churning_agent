@@ -33,7 +33,7 @@ Anti-overfit measures
   no specific case examples allowed).
 - Improvement on BOTH splits is required to accept a change.
 
-Run from workspace/:
+Run from churning_agent/:
     uv run python -m churning_agent.eval.improve_classifier
     uv run python -m churning_agent.eval.improve_classifier --iterations 3
 """
@@ -41,27 +41,26 @@ Run from workspace/:
 import argparse
 import json
 import re
-import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from rich.console import Console
 
-load_dotenv(Path(__file__).parent.parent / ".env")
+from churning_agent._paths import PROJECT_ROOT
+load_dotenv(PROJECT_ROOT / ".env")
 
 import churning_agent.tools.classifier as _clf_module
 from churning_agent.eval.eval_classifier import evaluate_samples
 
 console = Console()
 
-_CASES_PATH = Path(__file__).parent / "cases.json"
-_HISTORY_PATH = Path(__file__).parent / "improvement_history.json"
+_EVAL_DIR = PROJECT_ROOT / "eval"
+_CASES_PATH = _EVAL_DIR / "cases.json"
+_HISTORY_PATH = _EVAL_DIR / "improvement_history.json"
 _CLASSIFIER_PATH = Path(__file__).parent.parent / "tools" / "classifier.py"
 
 MAX_ITERATIONS = 5

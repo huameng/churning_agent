@@ -9,7 +9,8 @@ from playwright.async_api import async_playwright
 
 _DATE_FORMATS = ["%B %d, %Y", "%b %d, %Y"]  # "June 6, 2026" or "Jun 6, 2026"
 _HEADING_LEVELS = {"h1": 1, "h2": 2, "h3": 3, "h4": 4, "h5": 5, "h6": 6}
-_CACHE_DIR = Path(__file__).parent.parent / "data" / "post_cache"
+from churning_agent._paths import DATA_DIR
+_CACHE_DIR = DATA_DIR / "post_cache"
 
 DOC_URL = "https://www.doctorofcredit.com/"
 DOC_PAGE_URL = "https://www.doctorofcredit.com/page/{page}/"

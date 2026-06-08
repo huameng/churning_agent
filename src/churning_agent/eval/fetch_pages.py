@@ -2,15 +2,12 @@
 Fetch post listings from a specific page range of Doctor of Credit and cache
 their offer sections. No date filtering — useful for building eval datasets.
 
-Run from workspace/:
+Run from churning_agent/:
     uv run python -m churning_agent.eval.fetch_pages --start 11 --end 20
 """
 
 import asyncio
-import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from playwright.async_api import async_playwright
 from rich.console import Console

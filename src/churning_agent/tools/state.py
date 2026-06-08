@@ -2,7 +2,9 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-_STATE_FILE = Path(__file__).parent.parent / "data" / "state.json"
+from churning_agent._paths import DATA_DIR
+
+_STATE_FILE = DATA_DIR / "state.json"
 
 
 def get_last_seen_url() -> str | None:

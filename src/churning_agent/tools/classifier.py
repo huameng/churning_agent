@@ -18,8 +18,9 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 from .profile import load_profile
 from .scraper import fetch_offer_section
 from . import store
+from churning_agent._paths import PROJECT_ROOT
 
-load_dotenv(Path(__file__).parent.parent / ".env")
+load_dotenv(PROJECT_ROOT / ".env")
 
 _client: genai.Client | None = None
 
@@ -66,6 +67,15 @@ Examples:
 * very long lock-up period.
 - UNCERTAIN: The profile does not contain enough information to classify confidently. Use ONLY when a specific unknown fact would change the label — not as a hedge on borderline cases. 
 
+When making a decision for which label to apply, use this workflow:
+* First, check which states are in the title of the post. If the user is NOT in one of those states, classify as IRRELEVANT.
+* Next, check if the post is something other than a direct offer. If it is, classify as IRRELEVANT.
+* Next, check if the post is for a credit card, bank account, or other service which the user does not have. If it is, classify as IRRELEVANT.
+* Once those are done, evaluate how much profit the user can make from the offer, and what the cost of that profit is.
+* If the offer is high enough profit, and no cost, classify as MONEYMAKER.
+* If the offer is high enough profit, with meaningful cost, classify as DISCOUNT_MONEYMAKER.
+* Otherwise, classify as WORTHLESS.
+* If the offer is confusing in some way due to not following any of these patterns, classify as UNCERTAIN and provide the questions which, when answered, would allow you to confidently classify it.
 When label is UNCERTAIN, populate `question` with a single, specific yes/no or short-answer question for the human that would resolve the uncertainty. Do not ask vague questions.
 
 Return JSON with:
