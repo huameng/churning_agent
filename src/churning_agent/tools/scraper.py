@@ -94,21 +94,15 @@ async def fetch_offer_section(url: str, title: str = "") -> str:
     return content
 
 
-def read_cache_entry(url: str) -> dict | None:
-    """Return the full cache entry dict for a URL, or None if not cached."""
-    path = _cache_path(url)
-    if path.exists():
-        return json.loads(path.read_text(encoding="utf-8"))
-    return None
-
-
 def _cache_path(url: str) -> Path:
     return _CACHE_DIR / f"{hashlib.md5(url.encode()).hexdigest()}.json"
 
 
 def _read_cache(url: str) -> str | None:
-    entry = read_cache_entry(url)
-    return entry["offer_section"] if entry else None
+    path = _cache_path(url)
+    if not path.exists():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))["offer_section"]
 
 
 def _write_cache(url: str, offer_section: str, title: str = "") -> None:

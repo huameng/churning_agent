@@ -10,7 +10,6 @@ mechanism here to drive a site we haven't approved.
 """
 
 import os
-from pathlib import Path
 
 from dotenv import load_dotenv
 

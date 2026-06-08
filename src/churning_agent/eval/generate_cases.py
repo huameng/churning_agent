@@ -11,6 +11,7 @@ Run from churning_agent/:
 
 import json
 import sqlite3
+import sys
 from pathlib import Path
 
 from rich.console import Console

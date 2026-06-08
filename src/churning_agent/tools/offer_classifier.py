@@ -20,8 +20,10 @@ from pydantic import BaseModel
 from . import valuation
 from .classifier import _get_client
 from .profile import UserProfile, load_profile
+from churning_agent import prompts
 
-_MODEL = "gemini-3.1-flash-lite"
+# Model id and system prompt live in config/prompts/offer_classifier.yaml.
+_PROMPT = "offer_classifier"
 
 
 class PortalOffer(BaseModel):
@@ -36,32 +38,6 @@ class OfferDecision(BaseModel):
     reasoning: str
     question: str | None = None            # populated only when UNCERTAIN
     estimated_value: float | None = None   # USD
-
-
-_SYSTEM_PROMPT = """You decide whether a cashback or points offer on a rewards portal is worth acting on for a user.
-
-Activating these offers is free and never spends money or commits the user to a purchase, so judge purely whether the offer is worth the user's attention given their profile and the value of the reward.
-
-Labels:
-- ACCEPT: Worth activating/flagging. A solid rate or bonus on a merchant the user plausibly uses, with expected value at or above their minimum profit threshold.
-- SKIP: Eligible but not worth it. Trivial reward, a merchant clearly irrelevant to the user, or expected value below the threshold.
-- UNCERTAIN: The profile lacks a specific fact that would change the decision (e.g. whether the user shops at a particular merchant, or holds a required loyalty account). Use ONLY when a concrete unknown fact would flip the label — not as a hedge.
-
-When label is UNCERTAIN, populate `question` with a single specific question for the human that would resolve it.
-
-Judge the REWARD AGAINST WHAT IT TAKES TO EARN IT, using the offer's requirements and reward breakdown when provided:
-- Many offers are tiered and the headline "up to N SB" is only fully earned by completing every goal. When a per-goal reward breakdown is given, estimate the value a typical user realistically attains with reasonable effort and little or no spend — NOT the theoretical maximum. For a game whose SB is mostly locked behind dozens of levels or weeks of play, count only the quick early goals; such offers are usually SKIP despite a big headline.
-- Account for requirements: a bank/brokerage bonus needing a modest direct deposit or a small qualifying action is usually a MONEYMAKER (count it near full value); an offer requiring significant spend, deposits you wouldn't make, or gig labor should be valued at the net benefit (often SKIP, or UNCERTAIN if it hinges on a fact about the user).
-- Set estimated_value to the realistic attainable NET USD value, and say in the reasoning which goals/conditions you assumed.
-
-Convert any non-USD reward to USD using the provided conversion table before judging value.
-
-Return JSON with:
-- label: ACCEPT, SKIP, or UNCERTAIN
-- reasoning: 1-2 sentences
-- question: the specific question (UNCERTAIN only, else null)
-- estimated_value: expected net USD value if acted on, else null
-"""
 
 
 def _build_prompt(offer: PortalOffer, profile: UserProfile) -> str:
@@ -81,13 +57,14 @@ Classify this offer."""
 def classify_offer(offer: PortalOffer, profile: UserProfile | None = None) -> OfferDecision:
     """Classify a single portal offer. Testable core — no ADK dependency."""
     profile = profile or load_profile()
+    cfg = prompts.load(_PROMPT)
     response = _get_client().models.generate_content(
-        model=_MODEL,
+        model=cfg.model,
         contents=_build_prompt(offer, profile),
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=OfferDecision,
-            system_instruction=_SYSTEM_PROMPT,
+            system_instruction=cfg.system,
         ),
     )
     return OfferDecision.model_validate_json(response.text)

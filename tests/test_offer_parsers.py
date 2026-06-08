@@ -27,9 +27,12 @@ async def test_parses_swagbucks_cards(session):
     offers = await parse_offers(session, "swagbucks")
     # two distinct cards (the duplicate Raid card is deduped by title)
     assert len(offers) == 2
-    by_title = {o["title"]: o["reward"] for o in offers}
+    by_title = {o.title: o.reward_text for o in offers}
     assert by_title["Raid Shadow Legends Desktop"] == "up to 23,130 SB"
     assert by_title["SoFi Relay - Get Rewarded"] == "400 SB"
+    # reward unit is inferred from the text, so the DOM path is valued too
+    sofi = next(o for o in offers if o.title == "SoFi Relay - Get Rewarded")
+    assert sofi.reward.amount == 400 and sofi.reward.unit == "SB"
 
 
 def test_parse_swagbucks_api_full_list():
@@ -48,12 +51,13 @@ def test_parse_swagbucks_api_full_list():
     }
     offers = parse_swagbucks_api(payload)
     assert len(offers) == 2
-    sofi = next(o for o in offers if o["title"] == "SoFi Checking")
-    assert sofi["key"] == "999"
-    assert sofi["reward"] == "36,500 SB"
-    assert sofi["is_game"] is False
-    shortical = next(o for o in offers if o["title"] == "Shortical")
-    assert shortical["reward"] == "up to 5,425 SB"   # useEarnUpTo -> "up to"
+    sofi = next(o for o in offers if o.title == "SoFi Checking")
+    assert sofi.key == "999"
+    assert sofi.reward_text == "36,500 SB"
+    assert sofi.reward.amount == 36500 and sofi.reward.unit == "SB"
+    assert sofi.is_game is False
+    shortical = next(o for o in offers if o.title == "Shortical")
+    assert shortical.reward_text == "up to 5,425 SB"   # useEarnUpTo -> "up to"
 
 
 def test_parse_swagbucks_api_captures_requirements_and_events():
@@ -69,9 +73,11 @@ def test_parse_swagbucks_api_captures_requirements_and_events():
         ],
     }]}
     o = parse_swagbucks_api(payload)[0]
-    assert len(o["events"]) == 2                       # non-payable dropped
-    assert "$400 direct deposit" in o["detail"]
-    assert "Money Direct Deposit: 35000 SB" in o["detail"]
+    assert len(o.reward_breakdown) == 2                # non-payable dropped
+    assert o.reward_breakdown[1].name == "Money Direct Deposit"
+    assert o.reward_breakdown[1].sb == 35000
+    assert "$400 direct deposit" in o.detail
+    assert "Money Direct Deposit: 35000 SB" in o.detail
 
 
 async def test_unknown_site_has_no_parser(session):

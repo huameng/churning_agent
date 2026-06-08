@@ -15,7 +15,7 @@ from google import genai
 from google.adk.agents import LlmAgent
 from google.genai import types
 
-import churning_agent.tools.classifier as _clf_module
+from churning_agent import prompts
 from churning_agent.eval.eval_classifier import evaluate_samples, _RESULTS_DIR
 from churning_agent.eval.improve_classifier import (
     MIN_HOLDOUT_F1,
@@ -23,7 +23,6 @@ from churning_agent.eval.improve_classifier import (
     TRAIN_FRAC,
     _CASES_PATH,
     _HISTORY_PATH,
-    _write_system_prompt,
     macro_f1,
     stratified_split,
     _load_history,
@@ -33,7 +32,8 @@ from churning_agent.eval.improve_classifier import (
 from churning_agent._paths import PROJECT_ROOT
 load_dotenv(PROJECT_ROOT / ".env")
 
-_MODEL = "gemini-3.1-flash-lite"
+# The classifier whose prompt this agent tunes (config/prompts/post_classifier.yaml).
+_CLASSIFIER_PROMPT = "post_classifier"
 
 
 # ---------------------------------------------------------------------------
@@ -65,17 +65,10 @@ def _write_split_result(split: str, n_cases: int, metrics: dict, failures: list)
 # Tools
 # ---------------------------------------------------------------------------
 
-def run_eval() -> dict:
-    """
-    Run the classifier against all eval cases.
-    Writes a timestamped result file to eval/results/.
-    Returns macro F1, per-label F1, total cases, failure count, and failures.
-    """
-    all_cases = json.loads(_CASES_PATH.read_text(encoding="utf-8"))
-    content_by_url = {c["url"]: c.get("content", "") for c in all_cases}
-
-    metrics, failures = evaluate_samples(all_cases)
-    enriched = [
+def _enrich_failures(failures: list, cases: list) -> list:
+    """Attach a content snippet to each failure so the proposer sees the offer text."""
+    content_by_url = {c["url"]: c.get("content", "") for c in cases}
+    return [
         {
             "title": f["title"],
             "url": f.get("url"),
@@ -87,15 +80,32 @@ def run_eval() -> dict:
         }
         for f in failures
     ]
-    path = _write_split_result("all", len(all_cases), metrics, enriched)
+
+
+def _eval(cases: list, split: str) -> dict:
+    """Evaluate `cases`, write a timestamped result file, and return the summary."""
+    metrics, failures = evaluate_samples(cases)
+    enriched = _enrich_failures(failures, cases)
+    path = _write_split_result(split, len(cases), metrics, enriched)
     return {
+        "split": split,
+        "n_cases": len(cases),
         "macro_f1": round(macro_f1(metrics), 4),
-        "total_cases": len(all_cases),
-        "failure_count": len(failures),
         "per_label_f1": {label: round(m["f1"], 4) for label, m in metrics.items()},
+        "failure_count": len(failures),
         "result_file": str(path),
         "failures": enriched,
     }
+
+
+def run_eval() -> dict:
+    """
+    Run the classifier against ALL eval cases (no split).
+    Writes a timestamped result file to eval/results/. Returns macro F1,
+    per-label F1, case count, result file path, and failures.
+    """
+    all_cases = json.loads(_CASES_PATH.read_text(encoding="utf-8"))
+    return _eval(all_cases, "all")
 
 
 def run_eval_split(split: str) -> dict:
@@ -111,37 +121,12 @@ def run_eval_split(split: str) -> dict:
     """
     all_cases = json.loads(_CASES_PATH.read_text(encoding="utf-8"))
     train, holdout = stratified_split(all_cases, frac=TRAIN_FRAC, seed=SPLIT_SEED)
-    cases = train if split == "train" else holdout
-    content_by_url = {c["url"]: c.get("content", "") for c in cases}
-
-    metrics, failures = evaluate_samples(cases)
-    enriched = [
-        {
-            "title": f["title"],
-            "url": f.get("url"),
-            "expected": f["expected"],
-            "got": f["got"],
-            "model_reasoning": f["model_reasoning"],
-            "human_reasoning": f.get("human_reasoning"),
-            "content_snippet": content_by_url.get(f.get("url"), "")[:300],
-        }
-        for f in failures
-    ]
-    path = _write_split_result(split, len(cases), metrics, enriched)
-    return {
-        "split": split,
-        "n_cases": len(cases),
-        "macro_f1": round(macro_f1(metrics), 4),
-        "per_label_f1": {label: round(m["f1"], 4) for label, m in metrics.items()},
-        "failure_count": len(failures),
-        "result_file": str(path),
-        "failures": enriched,
-    }
+    return _eval(train if split == "train" else holdout, split)
 
 
 def get_classifier_prompt() -> str:
     """Return the current classifier system prompt."""
-    return _clf_module._SYSTEM_PROMPT
+    return prompts.load(_CLASSIFIER_PROMPT).system
 
 
 def set_classifier_prompt(new_prompt: str) -> str:
@@ -152,17 +137,17 @@ def set_classifier_prompt(new_prompt: str) -> str:
     Args:
         new_prompt: The full replacement prompt text.
     """
-    _clf_module._SYSTEM_PROMPT = new_prompt
+    prompts.set_system(_CLASSIFIER_PROMPT, new_prompt)
     return "Prompt updated in memory. Run eval to test it, then call save_classifier_prompt to persist."
 
 
 def save_classifier_prompt() -> str:
     """
-    Persist the current in-memory classifier prompt to classifier.py on disk.
+    Persist the current in-memory classifier prompt to its YAML on disk.
     Call this only after verifying the new prompt improves eval metrics.
     """
-    _write_system_prompt(_clf_module._SYSTEM_PROMPT)
-    return "Prompt saved to classifier.py."
+    prompts.save_system(_CLASSIFIER_PROMPT, prompts.load(_CLASSIFIER_PROMPT).system)
+    return "Prompt saved to config/prompts/post_classifier.yaml."
 
 
 def propose_prompt_improvement(failures: list) -> dict:
@@ -199,7 +184,7 @@ def propose_prompt_improvement(failures: list) -> dict:
             sections.append(entry)
 
     failure_block = "\n".join(sections)
-    current_prompt = _clf_module._SYSTEM_PROMPT
+    current_prompt = prompts.load(_CLASSIFIER_PROMPT).system
 
     annotation_note = ""
     if unannotated:
@@ -208,6 +193,7 @@ def propose_prompt_improvement(failures: list) -> dict:
             "Infer the correct rule from the offer text and model reasoning.\n"
         )
 
+    cfg = prompts.load("prompt_improver")
     meta_prompt = f"""You are improving a classifier system prompt. The classifier assigns one of five
 labels (IRRELEVANT, MONEYMAKER, DISCOUNT_MONEYMAKER, WORTHLESS, UNCERTAIN) to Doctor of Credit blog posts.
 
@@ -223,24 +209,14 @@ and a human annotation where available (human annotations are high-signal — pr
 Failures:
 {failure_block}
 
-Task: Propose a targeted improvement to the label definitions or classification criteria
-that would fix the most failures above. Your change must:
-- Modify the label definitions or decision criteria only
-- NOT add specific post titles or examples from the failures above
-- NOT change the JSON output format description
-- Make whatever scope of change is needed — rewrite a definition entirely if that's what it takes
-
-Respond with a JSON object with three fields:
-- "new_prompt": the complete updated system prompt text
-- "what_changed": one sentence describing exactly what you changed
-- "why": 2-3 sentences explaining the failure pattern and why this change fixes it"""
+{cfg.system}"""
 
     client = genai.Client()
     response = client.models.generate_content(
-        model=_MODEL,
+        model=cfg.model,
         contents=meta_prompt,
         config=types.GenerateContentConfig(
-            thinking_config=types.ThinkingConfig(thinking_budget=8000),
+            thinking_config=types.ThinkingConfig(thinking_budget=cfg.thinking_budget),
             response_mime_type="application/json",
         ),
     )
@@ -322,121 +298,12 @@ def get_improvement_history() -> dict:
 # Agent
 # ---------------------------------------------------------------------------
 
+_AGENT = prompts.load("improvement_agent")
 improvement_agent = LlmAgent(
-    model=_MODEL,
+    model=_AGENT.model,
     name="improvement_agent",
     description="Runs classifier evals and iteratively improves the classifier system prompt.",
-    instruction=f"""You improve the DoC classifier by running evals and proposing targeted prompt changes.
-
-When asked about past runs or improvement history, call get_improvement_history() and summarise results.
-
-When asked to run evals and improve, execute this loop (up to 5 iterations). You MUST narrate every
-step in detail — do not skip output between tool calls.
-
----
-
-**Step 1 — Baseline**
-Call run_eval_split("train") and run_eval_split("holdout") in parallel.
-
-Output IMMEDIATELY (before any further tool calls):
-```
-📊 Baseline
-  Train macro-F1:   X.XXX  (N failures / M cases)
-  Holdout macro-F1: X.XXX  (N failures / M cases)
-  Result files: <path>
-
-Failures on train:
-  • EXPECTED → GOT  "Title"
-    Offer: <first 100 chars of content_snippet>
-  (list every failure)
-
-Unannotated failures (no human_reasoning): N
-```
-
-Save the original prompt via get_classifier_prompt().
-
----
-
-**Step 2 — Check for failures**
-If train failures = 0: report the classifier is already clean and stop.
-
----
-
-**Step 3 — Propose a change**
-Call propose_prompt_improvement with the full failures list from the train result.
-
-Output IMMEDIATELY:
-```
-💡 Proposed change
-  What changed: <what_changed>
-  Why: <why>
-
-  Prompt diff (changed lines only):
-  - <old line(s)>
-  + <new line(s)>
-```
-
----
-
-**Step 4 — Test the change**
-Call set_classifier_prompt(new_prompt from the proposal).
-Call run_eval_split("train") and run_eval_split("holdout") in parallel.
-
-Output IMMEDIATELY:
-```
-🧪 Test results
-  Train:   X.XXX → X.XXX  (delta: +/-0.XXX)
-  Holdout: X.XXX → X.XXX  (delta: +/-0.XXX)
-```
-
----
-
-**Step 5 — Accept or reject**
-
-Acceptance rule:
-  ACCEPT if train macro-F1 improved (>= 0, i.e. did not get worse) AND holdout macro-F1 >= {MIN_HOLDOUT_F1}
-  REJECT if train got worse OR holdout dropped below {MIN_HOLDOUT_F1}
-
-Always call record_improvement_attempt regardless of outcome.
-
-On ACCEPT:
-  Call save_classifier_prompt().
-  Output: "✅ Accepted and saved."
-
-On REJECT — overfit risk:
-  Call set_classifier_prompt(original_prompt) to revert.
-  Output: "❌ Rejected — holdout dropped to X.XXX (floor {MIN_HOLDOUT_F1}). Reverted."
-
-On REJECT — train got worse:
-  Call set_classifier_prompt(original_prompt) to revert.
-  Output: "❌ Rejected — train F1 fell by X.XXX. Reverted."
-
----
-
-**Step 6 — Loop or stop**
-If accepted: loop back to Step 1 (update "original prompt" to the new one).
-If rejected: stop.
-Stop after 5 accepted iterations regardless.
-
----
-
-**Final report** (always give this, even after a single rejected attempt)
-```
-📈 Summary
-  Iterations run: N  |  Accepted: N
-  Train:   X.XXX → X.XXX
-  Holdout: X.XXX → X.XXX
-
-Changes accepted:
-  1. <what_changed>
-
-Changes rejected:
-  1. <what_changed> — <reason>
-```
-
-If there are failures with no human_reasoning, end with:
-"⚠ N failure(s) have no human annotation. Add notes in the case manager for better-targeted improvements."
-""",
+    instruction=_AGENT.system.replace("{min_holdout_f1}", str(MIN_HOLDOUT_F1)),
     tools=[
         run_eval,
         run_eval_split,

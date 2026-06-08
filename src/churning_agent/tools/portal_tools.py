@@ -10,14 +10,14 @@ from .browser import ActionResult, get_session
 from .credentials import get_credentials
 from .escalation import StuckDetector
 from . import offer_log
-from . import valuation
+from .offer import Offer
 from .offer_classifier import PortalOffer, classify_offer
-from .offer_parsers import fetch_swagbucks_offers, parse_offers
+from .offer_parsers import API_PARSERS, fetch_api_offers, parse_offers
 from .sites import REGISTRY
 
 # Full offer detail from the last list_offers call, keyed by (site, key), so
 # assess_offer can classify using requirements + reward breakdown.
-_offer_cache: dict[tuple[str, str], dict] = {}
+_offer_cache: dict[tuple[str, str], Offer] = {}
 
 # Per-site stuck detectors, so concurrent site lanes don't interfere.
 _stuck: dict[str, StuckDetector] = {}
@@ -89,8 +89,10 @@ async def list_offers(site: str) -> str:
         return f"'{site}' is not a whitelisted site. Allowed: {', '.join(REGISTRY)}."
     session = await get_session(site)
 
-    if site == "swagbucks":
-        offers = await fetch_swagbucks_offers(session, adapter.offers_url)
+    if adapter.offers_api_host:
+        offers = await fetch_api_offers(
+            session, adapter.offers_url, adapter.offers_api_host, API_PARSERS[site]
+        )
     else:
         nav = await session.navigate(adapter.offers_url)
         if not nav.success:
@@ -99,27 +101,26 @@ async def list_offers(site: str) -> str:
         for _ in range(4):
             await session.scroll("down")
             await session.page.wait_for_timeout(1500)
-        offers = [{"key": o["title"], "title": o["title"], "reward": o["reward"],
-                   "sb": None, "is_game": False} for o in await parse_offers(session, site)]
+        offers = await parse_offers(session, site)
 
     if not offers:
         return ("No offers parsed (layout/API may have changed). "
                 "Fall back to observe_page and read offers from the elements/text.")
 
     for o in offers:
-        o["usd"] = valuation.to_usd(o["sb"], "SB") if o.get("sb") else None
-        o["seen"] = offer_log.is_seen(site, o["key"])
-        _offer_cache[(site, o["key"])] = o      # remember detail for assess_offer
-    offers.sort(key=lambda o: (o.get("usd") or 0), reverse=True)
+        o.usd = o.value_usd()
+        o.seen = offer_log.is_seen(site, o.key)
+        _offer_cache[(site, o.key)] = o      # remember detail for assess_offer
+    offers.sort(key=lambda o: (o.usd or 0), reverse=True)
 
-    new_ct = sum(1 for o in offers if not o["seen"])
+    new_ct = sum(1 for o in offers if not o.seen)
     lines = [f"{len(offers)} offers on {site} — {new_ct} NEW since last run. "
              f"Pass the [key=...] to note_offer for any you report:"]
     for i, o in enumerate(offers):
-        val = f" ~${o['usd']:.0f}" if o.get("usd") else ""
-        kind = " [game]" if o.get("is_game") else ""
-        tag = "" if o["seen"] else " (NEW)"
-        lines.append(f"  {i}. {o['reward']}{val} — {o['title']}{kind}{tag} [key={o['key']}]")
+        val = f" ~${o.usd:.0f}" if o.usd else ""
+        kind = " [game]" if o.is_game else ""
+        tag = "" if o.seen else " (NEW)"
+        lines.append(f"  {i}. {o.reward_text}{val} — {o.title}{kind}{tag} [key={o.key}]")
     return "\n".join(lines)
 
 
@@ -130,9 +131,9 @@ def offer_details(site: str, offer_key: str) -> str:
     o = _offer_cache.get((site, offer_key))
     if o is None:
         return f"No cached offer {offer_key} for {site}. Call list_offers({site}) first."
-    return (f"{o['title']} — {o['reward']}"
-            + (" [game]" if o.get("is_game") else "")
-            + f"\n{o.get('detail') or '(no further detail provided)'}")
+    return (f"{o.title} — {o.reward_text}"
+            + (" [game]" if o.is_game else "")
+            + f"\n{o.detail or '(no further detail provided)'}")
 
 
 def assess_offer(site: str, offer_key: str) -> dict:
@@ -147,11 +148,11 @@ def assess_offer(site: str, offer_key: str) -> dict:
     o = _offer_cache.get((site, offer_key))
     if o is None:
         return {"error": f"No cached offer {offer_key} for {site}. Call list_offers({site}) first."}
-    offer = PortalOffer(merchant=o["title"], reward=o["reward"], description=o.get("detail", ""))
+    offer = PortalOffer(merchant=o.title, reward=o.reward_text, description=o.detail)
     result = classify_offer(offer)
     return {
-        "title": o["title"],
-        "reward": o["reward"],
+        "title": o.title,
+        "reward": o.reward_text,
         "label": result.label,
         "reasoning": result.reasoning,
         "question": result.question,

@@ -10,7 +10,7 @@ authenticated cookies then persist and future agent runs skip the login page.
 import asyncio
 import sys
 
-from churning_agent.tools.browser import BrowserSession, close_session
+from churning_agent.tools.browser import BrowserSession
 from churning_agent.tools.sites import REGISTRY
 
 
@@ -40,7 +40,7 @@ async def _main(site: str) -> None:
         print(f"Could not confirm login (no '{adapter.logged_in_selector}' found). "
               "If you did log in, the cookies are still saved; the marker selector may need updating.")
 
-    await close_session()
+    await session.stop()
 
 
 def main() -> None:

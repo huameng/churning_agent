@@ -1,6 +1,5 @@
 import json
 from datetime import datetime
-from pathlib import Path
 
 from churning_agent._paths import DATA_DIR
 

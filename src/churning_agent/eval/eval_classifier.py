@@ -15,6 +15,7 @@ Run from churning_agent/:
 
 import argparse
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -252,15 +253,22 @@ def _write_results(run_at: str, cases: list[dict], passed: int, failed: int, ski
     return path
 
 
-def evaluate_samples(samples: list[dict]) -> tuple[dict, list[dict]]:
+def _post_classify(sample: dict):
+    """Default classify_fn for evaluate_samples: the DoC post classifier."""
+    return classify(sample["title"], sample["content"])
+
+
+def evaluate_samples(samples: list[dict], classify_fn=_post_classify) -> tuple[dict, list[dict]]:
     """
-    Run classify() on samples without any printing.
-    Returns (metrics_dict, failures_list).
+    Run a classifier over samples without any printing, returning
+    (metrics_dict, failures_list). `classify_fn(sample)` returns an object with
+    .label/.reasoning/.estimated_value, so this harness works for any classifier
+    (the post classifier by default, the offer classifier via eval_offers).
     Used by the improvement loop.
     """
     case_results = []
     for sample in samples:
-        result = classify(sample["title"], sample["content"])
+        result = classify_fn(sample)
         expected = sample.get("expected")
         outcome = (
             "skip" if expected is None

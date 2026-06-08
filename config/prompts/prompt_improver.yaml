@@ -1,0 +1,14 @@
+model: gemini-3-flash-preview
+thinking_budget: 8000
+system: |
+  Task: Propose a targeted improvement to the label definitions or classification criteria
+  that would fix the most failures above. Your change must:
+  - Modify the label definitions or decision criteria only
+  - NOT add specific post titles or examples from the failures above
+  - NOT change the JSON output format description
+  - Make whatever scope of change is needed — rewrite a definition entirely if that's what it takes
+
+  Respond with a JSON object with three fields:
+  - "new_prompt": the complete updated system prompt text
+  - "what_changed": one sentence describing exactly what you changed
+  - "why": 2-3 sentences explaining the failure pattern and why this change fixes it

@@ -19,6 +19,7 @@ __pycache__/
 
 # Eval runtime artifacts (regenerated from cache, live at eval/ in project root)
 eval/cases.json
+eval/offer_cases.json
 eval/failures.json
 eval/excluded_urls.json
 eval/results/

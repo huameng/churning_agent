@@ -19,6 +19,11 @@ class SiteAdapter(BaseModel):
     login_url: str
     offers_url: str
     credential_key: str                 # key into .secrets.env (see credentials.py)
+    # If set, list_offers reads the full offer list from the background API
+    # response at this host (see offer_parsers.fetch_api_offers + API_PARSERS);
+    # otherwise it scrolls the page and uses the DOM parser. This is the per-site
+    # "how to enumerate offers" switch — adding an API site is config + a parser.
+    offers_api_host: str | None = None
     # Deterministic login recipe (CSS selectors). The agent falls back to
     # generic observe/click reasoning when these don't match the live page.
     username_selector: str
@@ -55,6 +60,9 @@ SWAGBUCKS = SiteAdapter(
     # MONEYMAKERs). Other sections: /surveys, /games-new, /shop, /invite.
     offers_url="https://www.swagbucks.com/discover-new/featured",
     credential_key="swagbucks",
+    # The Discover page fetches its full offer list from this third-party API;
+    # we read the response the whitelisted page itself makes (never navigate to it).
+    offers_api_host="disco-hub.prodegeapis.com/promo/api/offers",
     username_selector="input[name='email']",
     password_selector="input[name='password']",
     submit_selector="button:has-text('Log In')",
