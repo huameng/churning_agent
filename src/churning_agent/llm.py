@@ -11,13 +11,18 @@ backoff. Two entry points, covering the two ways we call the model:
   model calls (including sub-agents invoked via AgentTool) are retried too.
 """
 import asyncio
+import logging
 
 import httpx
 from google.adk.models.google_llm import Gemini
 from google.genai import errors as genai_errors
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
-_MAX_ATTEMPTS = 5
+logger = logging.getLogger(__name__)
+
+# A demand-spike 503 can last a while, so give it a real budget: ~2+4+8+16+32+60
+# ≈ 2 min of backoff across the attempts before giving up.
+_MAX_ATTEMPTS = 7
 _BASE_WAIT = 2   # seconds; exponential backoff, capped at _MAX_WAIT
 _MAX_WAIT = 60
 
@@ -32,10 +37,20 @@ def is_transient(exc: BaseException) -> bool:
     return "503" in s or "UNAVAILABLE" in s or "ReadError" in s
 
 
+def _log_before_sleep(retry_state) -> None:
+    exc = retry_state.outcome.exception()
+    logger.warning(
+        "transient LLM error (%s); retry %d/%d in %.0fs",
+        type(exc).__name__, retry_state.attempt_number + 1, _MAX_ATTEMPTS,
+        getattr(retry_state.next_action, "sleep", 0),
+    )
+
+
 retry_transient = retry(
     retry=retry_if_exception(is_transient),
     wait=wait_exponential(multiplier=_BASE_WAIT, min=_BASE_WAIT, max=_MAX_WAIT),
     stop=stop_after_attempt(_MAX_ATTEMPTS),
+    before_sleep=_log_before_sleep,
     reraise=True,
 )
 
@@ -57,7 +72,12 @@ class _RetryingGemini(Gemini):
             except Exception as e:
                 if yielded or attempt >= _MAX_ATTEMPTS or not is_transient(e):
                     raise
-                await asyncio.sleep(min(_BASE_WAIT * 2 ** (attempt - 1), _MAX_WAIT))
+                delay = min(_BASE_WAIT * 2 ** (attempt - 1), _MAX_WAIT)
+                logger.warning(
+                    "model %s: transient error (%s); retry %d/%d in %ds",
+                    self.model, type(e).__name__, attempt + 1, _MAX_ATTEMPTS, delay,
+                )
+                await asyncio.sleep(delay)
 
 
 def retrying_model(model_id: str) -> Gemini:
