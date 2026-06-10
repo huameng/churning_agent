@@ -14,8 +14,6 @@ import sys
 from google.adk.agents import LlmAgent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google.genai import types
-from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from churning_agent.tools.browser import close_session
 from churning_agent.tools.escalation import abort_workflow, ask_human
@@ -27,7 +25,7 @@ from churning_agent.tools.portal_tools import (
 )
 from churning_agent.tools.profile import update_profile
 from churning_agent import prompts
-from churning_agent.llm import retrying_model
+from churning_agent.llm import retrying_model, send_message
 
 # Model + instructions live in config/prompts/ (portal_agent + the orchestrated
 # protocol fragment appended to per-site agents).
@@ -72,29 +70,6 @@ swagbucks_agent = _site_agent("swagbucks")
 _APP = "portal_agent"
 
 
-def _is_503(exc: BaseException) -> bool:
-    return "503" in str(exc) or "UNAVAILABLE" in str(exc)
-
-
-@retry(
-    retry=retry_if_exception(_is_503),
-    wait=wait_exponential(multiplier=2, min=4, max=60),
-    stop=stop_after_attempt(5),
-    reraise=True,
-)
-async def _send(runner, session_id, text) -> None:
-    events = runner.run_async(
-        user_id="user",
-        session_id=session_id,
-        new_message=types.Content(role="user", parts=[types.Part(text=text)]),
-    )
-    async for event in events:
-        if event.is_final_response() and event.content and event.content.parts:
-            for part in event.content.parts:
-                if getattr(part, "text", None):
-                    print(part.text)
-
-
 async def _main(one_shot: str | None = None) -> None:
     session_service = InMemorySessionService()
     runner = Runner(agent=portal_agent, app_name=_APP, session_service=session_service)
@@ -102,7 +77,7 @@ async def _main(one_shot: str | None = None) -> None:
 
     try:
         if one_shot:
-            await _send(runner, session.id, one_shot)
+            await send_message(runner, session.id, one_shot)
             return
         print("Portal agent ready (e.g. 'check topcashback'). Ctrl+C or Ctrl+D to exit.\n")
         while True:
@@ -113,7 +88,7 @@ async def _main(one_shot: str | None = None) -> None:
                 break
             if not text:
                 continue
-            await _send(runner, session.id, text)
+            await send_message(runner, session.id, text)
             print()
     finally:
         await close_session()

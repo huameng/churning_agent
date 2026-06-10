@@ -3,6 +3,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 from churning_agent._paths import DATA_DIR
+from ._sql import run_select
 
 _DB_PATH = DATA_DIR / "classifications.db"
 
@@ -47,9 +48,9 @@ def query_classifications(sql: str) -> dict:
         id              INTEGER  -- autoincrement primary key
         url             TEXT     -- post URL
         title           TEXT     -- post title
-        label           TEXT     -- IRRELEVANT, MONEYMAKER, or WORTHLESS
+        label           TEXT     -- IRRELEVANT, MONEYMAKER, DISCOUNT_MONEYMAKER, WORTHLESS, or UNCERTAIN
         reasoning       TEXT     -- classifier reasoning
-        estimated_value REAL     -- estimated dollar value (MONEYMAKERs only, else NULL)
+        estimated_value REAL     -- estimated dollar value (set for MONEYMAKER/DISCOUNT_MONEYMAKER/WORTHLESS, else NULL)
         classified_at   TEXT     -- ISO 8601 UTC timestamp
 
     Args:
@@ -59,14 +60,4 @@ def query_classifications(sql: str) -> dict:
         Dict with 'columns' (list of column names) and 'rows' (list of row dicts).
         On error, returns {'error': '<message>'}.
     """
-    sql = sql.strip()
-    if not sql.upper().startswith("SELECT"):
-        return {"error": "Only SELECT queries are permitted."}
-    try:
-        conn = _conn()
-        cursor = conn.execute(sql)
-        columns = [d[0] for d in cursor.description]
-        rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        return {"columns": columns, "rows": rows, "count": len(rows)}
-    except sqlite3.Error as e:
-        return {"error": str(e)}
+    return run_select(_conn(), sql)

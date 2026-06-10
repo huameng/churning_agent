@@ -11,6 +11,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 from churning_agent._paths import DATA_DIR
+from ._sql import run_select
 
 _DB_PATH = DATA_DIR / "seen_offers.db"
 
@@ -94,13 +95,4 @@ def query_seen_offers(sql: str) -> dict:
     estimated_value, first_seen, last_seen, times_seen).
     Returns {columns, rows, count} or {error}.
     """
-    sql = sql.strip()
-    if not sql.upper().startswith("SELECT"):
-        return {"error": "Only SELECT queries are permitted."}
-    try:
-        cursor = _conn().execute(sql)
-        columns = [d[0] for d in cursor.description]
-        rows = [dict(zip(columns, r)) for r in cursor.fetchall()]
-        return {"columns": columns, "rows": rows, "count": len(rows)}
-    except sqlite3.Error as e:
-        return {"error": str(e)}
+    return run_select(_conn(), sql)

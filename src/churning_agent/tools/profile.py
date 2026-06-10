@@ -1,3 +1,4 @@
+import threading
 from datetime import date
 from pathlib import Path
 
@@ -7,6 +8,10 @@ from pydantic import BaseModel
 from churning_agent._paths import CONFIG_DIR
 
 _CONFIG_PATH = CONFIG_DIR / "user_profile.yaml"
+
+# update_profile does a read-modify-write of the YAML, and concurrent site lanes
+# (topcashback, swagbucks, ...) can each call it; serialize so edits don't clobber.
+_write_lock = threading.Lock()
 
 
 class ChurningCooldown(BaseModel):
@@ -61,22 +66,19 @@ class UserProfile(BaseModel):
         return "\n".join(lines)
 
 
-_profile: UserProfile | None = None
+# Cache keyed by config path, so loading a different profile (e.g. a test
+# fixture) doesn't return the default that was cached first.
+_profiles: dict[str, UserProfile] = {}
 
 
-def load_profile(config_path: Path | None = None) -> UserProfile:
-    global _profile
-    if _profile is not None:
-        return _profile
-
-    path = config_path or _CONFIG_PATH
+def _load_from(path: Path) -> UserProfile:
     with open(path) as f:
         data = yaml.safe_load(f)
 
     personal = data.get("personal", {})
     banking = data.get("banking", {})
 
-    _profile = UserProfile(
+    return UserProfile(
         state=personal["state"],
         zip_code=str(personal["zip_code"]),
         existing_accounts=[a.lower() for a in banking.get("existing_accounts", [])],
@@ -87,12 +89,18 @@ def load_profile(config_path: Path | None = None) -> UserProfile:
         ],
         preferences=Preferences(**(banking.get("preferences", {}))),
     )
-    return _profile
+
+
+def load_profile(config_path: Path | None = None) -> UserProfile:
+    path = config_path or _CONFIG_PATH
+    key = str(path)
+    if key not in _profiles:
+        _profiles[key] = _load_from(path)
+    return _profiles[key]
 
 
 def _reset_cache() -> None:
-    global _profile
-    _profile = None
+    _profiles.clear()
 
 
 def update_profile(field: str, value: str) -> str:
@@ -115,57 +123,60 @@ def update_profile(field: str, value: str) -> str:
     Returns a confirmation string describing what changed.
     """
     path = _CONFIG_PATH
-    with open(path) as f:
-        data = yaml.safe_load(f)
-
-    banking = data.setdefault("banking", {})
-    prefs = banking.setdefault("preferences", {})
-
-    LIST_FIELDS = {
-        "existing_accounts": banking,
-        "existing_credit_cards": banking,
-        "excluded_banks": prefs,
-        "additional_context": prefs,
-    }
-    BOOL_FIELDS = {
-        "willing_to_visit_branch": prefs,
-        "willing_to_open_brokerage": prefs,
-        "willing_to_do_credit_pull": prefs,
-    }
-
     value = value.strip()
 
-    if field in LIST_FIELDS:
-        container = LIST_FIELDS[field]
-        current = container.get(field, []) or []
-        normalized = value.lower() if field != "additional_context" else value
-        if normalized not in [x.lower() if field != "additional_context" else x for x in current]:
-            current.append(normalized if field != "additional_context" else value)
-            container[field] = current
-            msg = f"Added '{value}' to {field}."
+    # Serialize the whole read-modify-write: concurrent lanes editing the same
+    # YAML would otherwise lose each other's edits (last writer wins).
+    with _write_lock:
+        with open(path) as f:
+            data = yaml.safe_load(f)
+
+        banking = data.setdefault("banking", {})
+        prefs = banking.setdefault("preferences", {})
+
+        LIST_FIELDS = {
+            "existing_accounts": banking,
+            "existing_credit_cards": banking,
+            "excluded_banks": prefs,
+            "additional_context": prefs,
+        }
+        BOOL_FIELDS = {
+            "willing_to_visit_branch": prefs,
+            "willing_to_open_brokerage": prefs,
+            "willing_to_do_credit_pull": prefs,
+        }
+
+        if field in LIST_FIELDS:
+            container = LIST_FIELDS[field]
+            current = container.get(field, []) or []
+            normalized = value.lower() if field != "additional_context" else value
+            if normalized not in [x.lower() if field != "additional_context" else x for x in current]:
+                current.append(normalized if field != "additional_context" else value)
+                container[field] = current
+                msg = f"Added '{value}' to {field}."
+            else:
+                msg = f"'{value}' already present in {field}, no change."
+        elif field in BOOL_FIELDS:
+            if value.lower() not in ("true", "false"):
+                return f"Error: value for {field} must be 'true' or 'false', got '{value}'."
+            BOOL_FIELDS[field][field] = value.lower() == "true"
+            msg = f"Set {field} to {value.lower() == 'true'}."
+        elif field in ("min_profit_threshold", "min_discount_pct", "min_discount_savings"):
+            try:
+                prefs[field] = float(value)
+                msg = f"Set {field} to {float(value)}."
+            except ValueError:
+                return f"Error: {field} must be a number, got '{value}'."
         else:
-            msg = f"'{value}' already present in {field}, no change."
-    elif field in BOOL_FIELDS:
-        if value.lower() not in ("true", "false"):
-            return f"Error: value for {field} must be 'true' or 'false', got '{value}'."
-        BOOL_FIELDS[field][field] = value.lower() == "true"
-        msg = f"Set {field} to {value.lower() == 'true'}."
-    elif field in ("min_profit_threshold", "min_discount_pct", "min_discount_savings"):
-        try:
-            prefs[field] = float(value)
-            msg = f"Set {field} to {float(value)}."
-        except ValueError:
-            return f"Error: {field} must be a number, got '{value}'."
-    else:
-        return (
-            f"Error: unknown field '{field}'. Supported: "
-            "existing_accounts, existing_credit_cards, excluded_banks, additional_context, "
-            "willing_to_visit_branch, willing_to_open_brokerage, willing_to_do_credit_pull, "
-            "min_profit_threshold, min_discount_pct, min_discount_savings."
-        )
+            return (
+                f"Error: unknown field '{field}'. Supported: "
+                "existing_accounts, existing_credit_cards, excluded_banks, additional_context, "
+                "willing_to_visit_branch, willing_to_open_brokerage, willing_to_do_credit_pull, "
+                "min_profit_threshold, min_discount_pct, min_discount_savings."
+            )
 
-    with open(path, "w") as f:
-        yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        with open(path, "w") as f:
+            yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
-    _reset_cache()
+        _reset_cache()
     return msg

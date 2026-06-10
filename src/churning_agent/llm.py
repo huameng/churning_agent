@@ -3,19 +3,24 @@ Shared LLM-call resilience.
 
 A transient transport drop (httpx.ReadError and friends) or a 5xx / UNAVAILABLE
 server error should never kill a query — they're retried with exponential
-backoff. Two entry points, covering the two ways we call the model:
+backoff. Three entry points, covering every way we call the model:
 
 - retry_transient: a tenacity decorator for direct genai calls (the classifiers
   and the prompt improver).
 - retrying_model(model_id): an ADK BaseLlm wrapping Gemini so the agents' own
   model calls (including sub-agents invoked via AgentTool) are retried too.
+- send_message(runner, ...): drives one ADK turn, retried at the turn level so a
+  transient error that escapes the model wrapper (e.g. during tool dispatch)
+  doesn't kill the REPL. All three share the same `is_transient` predicate.
 """
 import asyncio
 import logging
 
 import httpx
+from google.adk.runners import Runner
 from google.adk.models.google_llm import Gemini
 from google.genai import errors as genai_errors
+from google.genai import types
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
@@ -83,3 +88,29 @@ class _RetryingGemini(Gemini):
 def retrying_model(model_id: str) -> Gemini:
     """An ADK model for `model_id` that self-heals through transient errors."""
     return _RetryingGemini(model=model_id)
+
+
+@retry(
+    retry=retry_if_exception(is_transient),
+    wait=wait_exponential(multiplier=_BASE_WAIT, min=_BASE_WAIT, max=_MAX_WAIT),
+    stop=stop_after_attempt(_MAX_ATTEMPTS),
+    before_sleep=_log_before_sleep,
+    reraise=True,
+)
+async def send_message(runner: Runner, session_id: str, text: str, user_id: str = "user") -> None:
+    """Send one user message through an ADK runner and print the final response
+    text. Retried at the turn level using the shared transient predicate.
+
+    Note: a retry replays the whole turn, so use this for the interactive REPL
+    loop (where re-running a failed turn is the desired recovery), not for turns
+    whose side effects must not repeat."""
+    events = runner.run_async(
+        user_id=user_id,
+        session_id=session_id,
+        new_message=types.Content(role="user", parts=[types.Part(text=text)]),
+    )
+    async for event in events:
+        if event.is_final_response() and event.content and event.content.parts:
+            for part in event.content.parts:
+                if getattr(part, "text", None):
+                    print(part.text)

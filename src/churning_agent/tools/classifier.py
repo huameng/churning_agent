@@ -14,7 +14,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel
 
-from .profile import load_profile
+from .profile import UserProfile, load_profile
 from .scraper import fetch_offer_section
 from . import store
 from churning_agent import prompts
@@ -46,6 +46,20 @@ class Classification(BaseModel):
 _PROMPT = "post_classifier"
 
 
+def _build_prompt(title: str, content: str, profile: UserProfile) -> str:
+    """Construct the classifier user prompt. Split out so it's unit-testable
+    without an LLM call (mirrors offer_classifier._build_prompt)."""
+    return f"""User Profile:
+{profile.to_prompt_str()}
+
+Post Title: {title}
+
+Post Content:
+{content}
+
+Classify this post."""
+
+
 @retry_transient
 def classify(title: str, content: str) -> Classification:
     """
@@ -58,18 +72,7 @@ def classify(title: str, content: str) -> Classification:
     Returns:
         Classification with label, reasoning, and estimated_value.
     """
-    profile = load_profile()
-
-    prompt = f"""User Profile:
-{profile.to_prompt_str()}
-
-Post Title: {title}
-
-Post Content:
-{content}
-
-Classify this post."""
-
+    prompt = _build_prompt(title, content, load_profile())
     cfg = prompts.load(_PROMPT)
     response = _get_client().models.generate_content(
         model=cfg.model,
@@ -100,7 +103,7 @@ async def fetch_and_classify(title: str, url: str) -> dict:
     logger.info("doc: classifying %s", title)
     content = await fetch_offer_section(url, title)
     result = classify(title, content)
-    val = f" (~${result.estimated_value:.0f})" if result.estimated_value else ""
+    val = f" (~${result.estimated_value:.0f})" if result.estimated_value is not None else ""
     logger.info("doc: %s -> %s%s", title, result.label, val)
     if result.label != "UNCERTAIN":
         store.record(url, title, result.label, result.reasoning, result.estimated_value)

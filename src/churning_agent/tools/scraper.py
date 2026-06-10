@@ -1,7 +1,7 @@
 import hashlib
 import json
 from dataclasses import dataclass, asdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from bs4 import BeautifulSoup
@@ -108,7 +108,7 @@ def _read_cache(url: str) -> str | None:
 def _write_cache(url: str, offer_section: str, title: str = "") -> None:
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
     _cache_path(url).write_text(
-        json.dumps({"url": url, "title": title, "fetched_at": datetime.utcnow().isoformat(), "offer_section": offer_section}),
+        json.dumps({"url": url, "title": title, "fetched_at": datetime.now(timezone.utc).isoformat(), "offer_section": offer_section}),
         encoding="utf-8",
     )
 

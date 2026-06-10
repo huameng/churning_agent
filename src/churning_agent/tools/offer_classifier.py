@@ -92,7 +92,7 @@ def classify_portal_offer(merchant: str, reward: str, description: str = "", url
     logger.info("portal: classifying %s (%s)", merchant, reward)
     offer = PortalOffer(merchant=merchant, reward=reward, description=description, url=url)
     result = classify_offer(offer)
-    val = f" (~${result.estimated_value:.0f})" if result.estimated_value else ""
+    val = f" (~${result.estimated_value:.0f})" if result.estimated_value is not None else ""
     logger.info("portal: %s -> %s%s", merchant, result.label, val)
     return {
         "merchant": merchant,

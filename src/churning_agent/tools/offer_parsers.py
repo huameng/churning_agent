@@ -71,6 +71,7 @@ async def fetch_api_offers(session, offers_url: str, api_host: str, parser) -> l
     background API response(s) at `api_host`, parsed via `parser`. Returns all
     offers merged across API calls (deduped by key)."""
     captured: list[dict] = []
+    tasks: list[asyncio.Task] = []
 
     async def on_resp(resp):
         if api_host in resp.url:
@@ -79,13 +80,16 @@ async def fetch_api_offers(session, offers_url: str, api_host: str, parser) -> l
             except Exception:
                 pass
 
-    handler = lambda r: asyncio.create_task(on_resp(r))  # noqa: E731
+    handler = lambda r: tasks.append(asyncio.create_task(on_resp(r)))  # noqa: E731
     session.page.on("response", handler)
     try:
         await session.navigate(offers_url)
         await session.page.wait_for_timeout(9000)  # let the offers API resolve
     finally:
         session.page.remove_listener("response", handler)
+    # Drain any reads still in flight so we don't drop a late payload.
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     by_key: dict[str, Offer] = {}
     for payload in captured:

@@ -9,7 +9,7 @@ import pytest
 from google.adk.models.google_llm import Gemini
 
 from churning_agent import llm
-from churning_agent.llm import _RetryingGemini, is_transient, retry_transient, retrying_model
+from churning_agent.llm import _RetryingGemini, is_transient, retry_transient, retrying_model, send_message
 
 
 async def _noop(*_a, **_k):
@@ -70,3 +70,34 @@ async def test_retrying_gemini_does_not_double_emit(monkeypatch):
         async for r in model.generate_content_async("req"):
             got.append(r)
     assert got == ["PARTIAL"]          # emitted once, then surfaced the error
+
+
+class _FakePart:
+    def __init__(self, text):
+        self.text = text
+
+
+class _FakeEvent:
+    def __init__(self, text):
+        self.content = type("C", (), {"parts": [_FakePart(text)]})()
+
+    def is_final_response(self):
+        return True
+
+
+class _FakeRunner:
+    """Records the message it was sent and replays one final event."""
+    def __init__(self, reply):
+        self._reply = reply
+        self.sent = None
+
+    async def run_async(self, *, user_id, session_id, new_message):
+        self.sent = new_message.parts[0].text
+        yield _FakeEvent(self._reply)
+
+
+async def test_send_message_prints_final_text(capsys):
+    runner = _FakeRunner("here are your moneymakers")
+    await send_message(runner, "sess-1", "show me")
+    assert runner.sent == "show me"
+    assert "here are your moneymakers" in capsys.readouterr().out

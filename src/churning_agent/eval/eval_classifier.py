@@ -16,7 +16,7 @@ Run from churning_agent/:
 import argparse
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from rich.console import Console
@@ -45,7 +45,7 @@ def run_eval(samples: list[dict], stop_on_unexpected: bool = False) -> int:
     table.add_column("Reasoning", max_width=45)
 
     passed = failed = skipped = 0
-    run_at = datetime.utcnow().isoformat()
+    run_at = datetime.now(timezone.utc).isoformat()
     case_results = []
 
     for sample in samples:
@@ -67,7 +67,7 @@ def run_eval(samples: list[dict], stop_on_unexpected: bool = False) -> int:
             match_str = "[red]FAIL[/red]"
             outcome = "fail"
 
-        value_str = f"${result.estimated_value:.0f}" if result.estimated_value else "-"
+        value_str = f"${result.estimated_value:.0f}" if result.estimated_value is not None else "-"
 
         table.add_row(
             sample["title"][:38],

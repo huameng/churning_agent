@@ -156,7 +156,7 @@ def assess_offer(site: str, offer_key: str) -> dict:
     logger.info("%s: assessing %s (%s)", site, o.title, o.reward_text)
     offer = PortalOffer(merchant=o.title, reward=o.reward_text, description=o.detail)
     result = classify_offer(offer)
-    val = f" (~${result.estimated_value:.0f})" if result.estimated_value else ""
+    val = f" (~${result.estimated_value:.0f})" if result.estimated_value is not None else ""
     logger.info("%s: %s -> %s%s", site, o.title, result.label, val)
     return {
         "title": o.title,

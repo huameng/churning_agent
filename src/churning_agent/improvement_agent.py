@@ -8,16 +8,16 @@ Exposed as AgentTool to the root agent so the user can say
 import json
 import logging
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
-from google import genai
 from google.adk.agents import LlmAgent
 from google.genai import types
 
 from churning_agent import prompts
 from churning_agent.llm import retry_transient, retrying_model
+from churning_agent.tools.classifier import _get_client
 from churning_agent.eval.eval_classifier import evaluate_samples, _RESULTS_DIR
 from churning_agent.eval.improve_classifier import (
     MIN_HOLDOUT_F1,
@@ -47,7 +47,7 @@ _CLASSIFIER_PROMPT = "post_classifier"
 def _write_split_result(split: str, n_cases: int, metrics: dict, failures: list) -> Path:
     """Write a timestamped result file to eval/results/ so the user has a record."""
     _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    run_at = datetime.utcnow().isoformat()
+    run_at = datetime.now(timezone.utc).isoformat()
     filename = run_at.replace(":", "").replace("-", "").replace("T", "_")[:15] + f"_{split}.json"
     path = _RESULTS_DIR / filename
     path.write_text(
@@ -160,7 +160,7 @@ def save_classifier_prompt() -> str:
 @retry_transient
 def _propose(meta_prompt: str, model: str, thinking_budget: int | None) -> str:
     """The improver's model call, retried through transient transport/server errors."""
-    response = genai.Client().models.generate_content(
+    response = _get_client().models.generate_content(
         model=model,
         contents=meta_prompt,
         config=types.GenerateContentConfig(
@@ -267,7 +267,7 @@ def record_improvement_attempt(
     history = _load_history()
     history.append({
         "iteration": iteration,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "train_f1_before": round(train_f1_before, 4),
         "train_f1_after": round(train_f1_after, 4),
         "holdout_f1_after": round(holdout_f1_after, 4),

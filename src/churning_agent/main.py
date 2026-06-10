@@ -3,35 +3,11 @@ import asyncio
 
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google.genai import types
-from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from .agent import root_agent
+from .llm import send_message
 
 _APP = "churning_agent"
-
-
-def _is_503(exc: BaseException) -> bool:
-    return "503" in str(exc) or "UNAVAILABLE" in str(exc)
-
-
-@retry(
-    retry=retry_if_exception(_is_503),
-    wait=wait_exponential(multiplier=2, min=4, max=60),
-    stop=stop_after_attempt(5),
-    reraise=True,
-)
-async def _send(runner: Runner, session_id: str, text: str) -> None:
-    events = runner.run_async(
-        user_id="user",
-        session_id=session_id,
-        new_message=types.Content(role="user", parts=[types.Part(text=text)]),
-    )
-    async for event in events:
-        if event.is_final_response() and event.content and event.content.parts:
-            for part in event.content.parts:
-                if hasattr(part, "text") and part.text:
-                    print(part.text)
 
 
 async def _main() -> None:
@@ -49,7 +25,7 @@ async def _main() -> None:
                 break
             if not text:
                 continue
-            await _send(runner, session.id, text)
+            await send_message(runner, session.id, text)
             print()
     finally:
         from .tools.browser import close_session

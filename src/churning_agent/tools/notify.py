@@ -16,7 +16,7 @@ def notify_moneymaker(title: str, url: str, reasoning: str, estimated_value: flo
     Returns:
         Confirmation string.
     """
-    value_str = f" (~${estimated_value:.0f})" if estimated_value else ""
+    value_str = f" (~${estimated_value:.0f})" if estimated_value is not None else ""
     console.print(f"\n[bold green]MONEYMAKER{value_str}[/bold green]: {title}")
     console.print(f"  [dim]{url}[/dim]")
     console.print(f"  {reasoning}")
