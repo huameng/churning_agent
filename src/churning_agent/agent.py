@@ -8,6 +8,7 @@ from .tools.notify import notify_moneymaker
 from .tools.scraper import fetch_posts
 from .tools.state import get_last_seen_url, set_last_seen_url
 from .tools.store import query_classifications
+from .tools.offer_log import query_seen_offers
 from .tools.profile import update_profile
 from .portal import swagbucks_agent, topcashback_agent
 from .improvement_agent import improvement_agent
@@ -47,6 +48,8 @@ root_agent = LlmAgent(
         AgentTool(agent=topcashback_agent),
         AgentTool(agent=swagbucks_agent),
         AgentTool(agent=improvement_agent),
+        query_classifications,
+        query_seen_offers,
         update_profile,
     ],
 )

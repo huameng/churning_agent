@@ -5,6 +5,7 @@ The `classify` function is the testable core — call it directly without ADK.
 The `fetch_and_classify` function is the ADK tool wrapper.
 """
 
+import logging
 from pathlib import Path
 from typing import Literal
 
@@ -21,6 +22,8 @@ from churning_agent.llm import retry_transient
 from churning_agent._paths import PROJECT_ROOT
 
 load_dotenv(PROJECT_ROOT / ".env")
+
+logger = logging.getLogger(__name__)
 
 _client: genai.Client | None = None
 
@@ -94,8 +97,11 @@ async def fetch_and_classify(title: str, url: str) -> dict:
         Dict with label, reasoning, estimated_value (dollars for MONEYMAKER and WORTHLESS, null for IRRELEVANT),
         question (UNCERTAIN only), title, url.
     """
+    logger.info("doc: classifying %s", title)
     content = await fetch_offer_section(url, title)
     result = classify(title, content)
+    val = f" (~${result.estimated_value:.0f})" if result.estimated_value else ""
+    logger.info("doc: %s -> %s%s", title, result.label, val)
     if result.label != "UNCERTAIN":
         store.record(url, title, result.label, result.reasoning, result.estimated_value)
     return {

@@ -12,6 +12,7 @@ purchase path to reason about — only whether the offer is worth the user's
 attention given their profile.
 """
 
+import logging
 from typing import Literal
 
 from google.genai import types
@@ -22,6 +23,8 @@ from .classifier import _get_client
 from .profile import UserProfile, load_profile
 from churning_agent import prompts
 from churning_agent.llm import retry_transient
+
+logger = logging.getLogger(__name__)
 
 # Model id and system prompt live in config/prompts/offer_classifier.yaml.
 _PROMPT = "offer_classifier"
@@ -86,8 +89,11 @@ def classify_portal_offer(merchant: str, reward: str, description: str = "", url
         Dict with label (ACCEPT/SKIP/UNCERTAIN), reasoning, question (UNCERTAIN only),
         estimated_value (USD), merchant.
     """
+    logger.info("portal: classifying %s (%s)", merchant, reward)
     offer = PortalOffer(merchant=merchant, reward=reward, description=description, url=url)
     result = classify_offer(offer)
+    val = f" (~${result.estimated_value:.0f})" if result.estimated_value else ""
+    logger.info("portal: %s -> %s%s", merchant, result.label, val)
     return {
         "merchant": merchant,
         "label": result.label,

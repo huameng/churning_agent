@@ -6,6 +6,7 @@ Exposed as AgentTool to the root agent so the user can say
 """
 
 import json
+import logging
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -32,6 +33,8 @@ from churning_agent.eval.improve_classifier import (
 
 from churning_agent._paths import PROJECT_ROOT
 load_dotenv(PROJECT_ROOT / ".env")
+
+logger = logging.getLogger(__name__)
 
 # The classifier whose prompt this agent tunes (config/prompts/post_classifier.yaml).
 _CLASSIFIER_PROMPT = "post_classifier"
@@ -85,8 +88,11 @@ def _enrich_failures(failures: list, cases: list) -> list:
 
 def _eval(cases: list, split: str) -> dict:
     """Evaluate `cases`, write a timestamped result file, and return the summary."""
+    logger.info("improver: evaluating %d case(s) [%s]", len(cases), split)
     metrics, failures = evaluate_samples(cases)
     enriched = _enrich_failures(failures, cases)
+    logger.info("improver: [%s] macro-F1=%.3f, %d failure(s)",
+                split, macro_f1(metrics), len(failures))
     path = _write_split_result(split, len(cases), metrics, enriched)
     return {
         "split": split,

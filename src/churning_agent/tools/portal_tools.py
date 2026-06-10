@@ -6,6 +6,8 @@ session itself; here we add stuck-detection (so the agent escalates instead of
 looping) and a deterministic login using the site adapter's recipe.
 """
 
+import logging
+
 from .browser import ActionResult, get_session
 from .credentials import get_credentials
 from .escalation import StuckDetector
@@ -14,6 +16,8 @@ from .offer import Offer
 from .offer_classifier import PortalOffer, classify_offer
 from .offer_parsers import API_PARSERS, fetch_api_offers, parse_offers
 from .sites import REGISTRY
+
+logger = logging.getLogger(__name__)
 
 # Full offer detail from the last list_offers call, keyed by (site, key), so
 # assess_offer can classify using requirements + reward breakdown.
@@ -114,6 +118,7 @@ async def list_offers(site: str) -> str:
     offers.sort(key=lambda o: (o.usd or 0), reverse=True)
 
     new_ct = sum(1 for o in offers if not o.seen)
+    logger.info("%s: listed %d offers (%d new)", site, len(offers), new_ct)
     lines = [f"{len(offers)} offers on {site} — {new_ct} NEW since last run. "
              f"Pass the [key=...] to note_offer for any you report:"]
     for i, o in enumerate(offers):
@@ -148,8 +153,11 @@ def assess_offer(site: str, offer_key: str) -> dict:
     o = _offer_cache.get((site, offer_key))
     if o is None:
         return {"error": f"No cached offer {offer_key} for {site}. Call list_offers({site}) first."}
+    logger.info("%s: assessing %s (%s)", site, o.title, o.reward_text)
     offer = PortalOffer(merchant=o.title, reward=o.reward_text, description=o.detail)
     result = classify_offer(offer)
+    val = f" (~${result.estimated_value:.0f})" if result.estimated_value else ""
+    logger.info("%s: %s -> %s%s", site, o.title, result.label, val)
     return {
         "title": o.title,
         "reward": o.reward_text,
@@ -172,7 +180,9 @@ def note_offer(site: str, offer_key: str, merchant: str = "", reward: str = "",
     Returns {new: bool, times_seen: int, first_seen}. Only report MONEYMAKERS
     where new=true; for new=false, the user has already seen it — don't re-surface.
     """
-    return offer_log.note_offer(site, offer_key, merchant, reward, label, estimated_value)
+    result = offer_log.note_offer(site, offer_key, merchant, reward, label, estimated_value)
+    logger.info("%s: recorded %s [%s] new=%s", site, merchant or offer_key, label or "?", result["new"])
+    return result
 
 
 async def portal_login(site: str) -> str:
