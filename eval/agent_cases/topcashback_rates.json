@@ -1,0 +1,25 @@
+{
+  "name": "topcashback_rates",
+  "agent": "topcashback_agent",
+  "description": "Logs in, reads rates, classifies the promising NEW offer, records it, and reports — without clicking through or trying to pre-activate anything.",
+  "user_message": "Check topcashback for new MONEYMAKERS.",
+  "tool_responses": {
+    "portal_login": "Logged in to topcashback (existing session confirmed).",
+    "list_offers": "2 offers on topcashback — 1 NEW since last run. Pass the [key=...] to note_offer for any you report:\n  0. $150.00 cashback ~$150 — Sky Mobile: new contract signup (NEW) [key=tcb-sky-1]\n  1. 8% cashback ~$8 — Nike [key=tcb-nike-2]",
+    "classify_portal_offer": {
+      "label": "ACCEPT",
+      "estimated_value": 150.0,
+      "reasoning": "Flat $150 cashback on a contract the user can cancel within the cooling-off period; effort is low.",
+      "question": null
+    },
+    "note_offer": "Recorded."
+  },
+  "expect": {
+    "tools_called": ["portal_login", "list_offers", "classify_portal_offer", "note_offer"],
+    "tools_not_called": ["click_element", "fill_field"],
+    "tool_args": [
+      {"tool": "note_offer", "args_contain": {"offer_key": "tcb-sky-1", "label": "ACCEPT"}}
+    ],
+    "response_contains": ["MONEYMAKERS", "Sky"]
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "name": "doc_finds_moneymaker",
+  "agent": "doc_agent",
+  "description": "Two new posts since last seen: classifies both (not the already-seen one), advances last_seen to the newest URL, and reports the MONEYMAKER.",
+  "user_message": "Find new MONEYMAKERS.",
+  "tool_responses": {
+    "get_last_seen_url": "https://www.doctorofcredit.com/chase-300-checking-bonus/",
+    "fetch_posts": [
+      [
+        {"title": "Wells Fargo $2,500 Premier Checking Bonus", "url": "https://www.doctorofcredit.com/wells-fargo-2500-premier-checking-bonus/", "date": "2026-06-11"},
+        {"title": "Lowe's: 20% Off Select Gift Cards", "url": "https://www.doctorofcredit.com/lowes-20-off-select-gift-cards/", "date": "2026-06-11"},
+        {"title": "Chase $300 Checking Bonus", "url": "https://www.doctorofcredit.com/chase-300-checking-bonus/", "date": "2026-06-10"}
+      ]
+    ],
+    "fetch_and_classify": {
+      "key_arg": "url",
+      "cases": {
+        "https://www.doctorofcredit.com/wells-fargo-2500-premier-checking-bonus/": {
+          "label": "MONEYMAKER",
+          "reasoning": "Large checking bonus with achievable deposit requirement and no fees.",
+          "estimated_value": 2500,
+          "question": null,
+          "title": "Wells Fargo $2,500 Premier Checking Bonus",
+          "url": "https://www.doctorofcredit.com/wells-fargo-2500-premier-checking-bonus/"
+        },
+        "https://www.doctorofcredit.com/lowes-20-off-select-gift-cards/": {
+          "label": "IRRELEVANT",
+          "reasoning": "A discount on gift cards requires spending; not a moneymaker.",
+          "estimated_value": null,
+          "question": null,
+          "title": "Lowe's: 20% Off Select Gift Cards",
+          "url": "https://www.doctorofcredit.com/lowes-20-off-select-gift-cards/"
+        }
+      },
+      "default": {
+        "label": "IRRELEVANT",
+        "reasoning": "Not an offer.",
+        "estimated_value": null,
+        "question": null
+      }
+    },
+    "set_last_seen_url": "Last seen URL updated."
+  },
+  "expect": {
+    "tools_called": ["get_last_seen_url", "fetch_posts", "fetch_and_classify", "set_last_seen_url"],
+    "call_counts": {"fetch_and_classify": [2, 2]},
+    "tool_args": [
+      {"tool": "set_last_seen_url", "args_contain": {"url": "wells-fargo-2500-premier-checking-bonus"}}
+    ],
+    "response_contains": ["MONEYMAKERS", "Wells Fargo"]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "orch_profile_update",
+  "agent": "churning_agent",
+  "description": "The user volunteers a fact about themselves: records it via update_profile immediately.",
+  "user_message": "By the way, I already have a Chime account.",
+  "tool_responses": {
+    "update_profile": "Profile updated."
+  },
+  "expect": {
+    "tools_called": ["update_profile"],
+    "tools_not_called": ["doc_agent", "topcashback_agent", "swagbucks_agent", "improvement_agent"],
+    "tool_args": [
+      {"tool": "update_profile", "args_contain": {"value": "Chime"}}
+    ]
+  }
+}

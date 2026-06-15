@@ -1,0 +1,38 @@
+{
+  "name": "swagbucks_assess_and_report",
+  "agent": "swagbucks_agent",
+  "description": "Logs in, lists offers, assesses the promising NEW offer by its real requirements, records it via note_offer, and never clicks through.",
+  "user_message": "Check swagbucks for new MONEYMAKERS.",
+  "tool_responses": {
+    "portal_login": "Logged in to swagbucks (existing session confirmed).",
+    "list_offers": "3 offers on swagbucks — 2 NEW since last run. Pass the [key=...] to note_offer for any you report:\n  0. up to 35000 SB ~$350 — Chime: open account + direct deposit (NEW) [key=sb-chime-123]\n  1. 1000 SB ~$10 — Hulu: subscribe to any plan [key=sb-hulu-789]\n  2. 600 SB ~$6 — Solitaire Cash: reach level 5 [game] (NEW) [key=sb-solitaire-456]",
+    "assess_offer": {
+      "key_arg": "offer_key",
+      "cases": {
+        "sb-chime-123": {
+          "label": "ACCEPT",
+          "estimated_value": 150.0,
+          "reasoning": "Signup (10000 SB) and a single direct deposit (5000 SB) are quick and attainable; the remaining 20000 SB requires sustained deposits and is excluded.",
+          "question": null
+        },
+        "sb-solitaire-456": {
+          "label": "SKIP",
+          "estimated_value": 6.0,
+          "reasoning": "Reaching level 5 takes hours of game grinding for ~$6.",
+          "question": null
+        }
+      },
+      "default": {"label": "SKIP", "estimated_value": 0, "reasoning": "Low value.", "question": null}
+    },
+    "note_offer": "Recorded."
+  },
+  "expect": {
+    "tools_called": ["portal_login", "list_offers", "assess_offer", "note_offer"],
+    "tools_not_called": ["click_element", "fill_field"],
+    "tool_args": [
+      {"tool": "assess_offer", "args_contain": {"offer_key": "sb-chime-123"}},
+      {"tool": "note_offer", "args_contain": {"offer_key": "sb-chime-123", "label": "ACCEPT"}}
+    ],
+    "response_contains": ["MONEYMAKERS", "Chime"]
+  }
+}

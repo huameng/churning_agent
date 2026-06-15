@@ -1,0 +1,19 @@
+{
+  "name": "doc_no_new_posts",
+  "agent": "doc_agent",
+  "description": "The newest post is the last-seen one: classifies nothing and reports no new MONEYMAKERS.",
+  "user_message": "Find new MONEYMAKERS.",
+  "tool_responses": {
+    "get_last_seen_url": "https://www.doctorofcredit.com/chase-300-checking-bonus/",
+    "fetch_posts": [
+      [
+        {"title": "Chase $300 Checking Bonus", "url": "https://www.doctorofcredit.com/chase-300-checking-bonus/", "date": "2026-06-11"}
+      ]
+    ]
+  },
+  "expect": {
+    "tools_called": ["get_last_seen_url", "fetch_posts"],
+    "call_counts": {"fetch_and_classify": [0, 0]},
+    "response_contains": ["none"]
+  }
+}

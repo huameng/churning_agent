@@ -1,0 +1,53 @@
+{
+  "name": "improver_accepts_good_change",
+  "agent": "improvement_agent",
+  "description": "Train F1 improves and holdout stays above the floor: tests the change in memory first, records the attempt as accepted, and saves the prompt.",
+  "user_message": "Run evals and improve the classifier. Run at most one iteration.",
+  "tool_responses": {
+    "run_eval_split": {
+      "key_arg": "split",
+      "cases": {
+        "train": [
+          {
+            "split": "train", "n_cases": 40, "macro_f1": 0.75,
+            "per_label_f1": {"MONEYMAKER": 0.8, "IRRELEVANT": 0.9, "WORTHLESS": 0.55},
+            "failure_count": 2, "result_file": "eval/results/fake_train_before.json",
+            "failures": [
+              {"title": "Lowe's: 20% Off Select Gift Cards", "url": "https://www.doctorofcredit.com/lowes-20-off-select-gift-cards/", "expected": "IRRELEVANT", "got": "MONEYMAKER", "model_reasoning": "20% savings looks like profit.", "human_reasoning": "Discounted gift cards require spending; never a moneymaker.", "content_snippet": "Save 20% on select gift cards at Lowe's this week..."},
+              {"title": "Visa Gift Card $5 Rebate", "url": "https://www.doctorofcredit.com/visa-gift-card-5-rebate/", "expected": "WORTHLESS", "got": "MONEYMAKER", "model_reasoning": "A $5 rebate is free money.", "human_reasoning": null, "content_snippet": "Get a $5 rebate when you buy a $100 Visa gift card (activation fee $5.95)..."}
+            ]
+          },
+          {
+            "split": "train", "n_cases": 40, "macro_f1": 0.85,
+            "per_label_f1": {"MONEYMAKER": 0.9, "IRRELEVANT": 0.9, "WORTHLESS": 0.75},
+            "failure_count": 1, "result_file": "eval/results/fake_train_after.json",
+            "failures": [
+              {"title": "Visa Gift Card $5 Rebate", "url": "https://www.doctorofcredit.com/visa-gift-card-5-rebate/", "expected": "WORTHLESS", "got": "MONEYMAKER", "model_reasoning": "A $5 rebate is free money.", "human_reasoning": null, "content_snippet": "Get a $5 rebate when you buy a $100 Visa gift card (activation fee $5.95)..."}
+            ]
+          }
+        ],
+        "holdout": [
+          {"split": "holdout", "n_cases": 10, "macro_f1": 0.84, "per_label_f1": {"MONEYMAKER": 0.85, "IRRELEVANT": 0.9, "WORTHLESS": 0.77}, "failure_count": 1, "result_file": "eval/results/fake_holdout_before.json", "failures": []},
+          {"split": "holdout", "n_cases": 10, "macro_f1": 0.86, "per_label_f1": {"MONEYMAKER": 0.85, "IRRELEVANT": 0.95, "WORTHLESS": 0.78}, "failure_count": 1, "result_file": "eval/results/fake_holdout_after.json", "failures": []}
+        ]
+      }
+    },
+    "get_classifier_prompt": "You classify Doctor of Credit blog posts into one of five labels... (original prompt)",
+    "propose_prompt_improvement": {
+      "new_prompt": "You classify Doctor of Credit blog posts into one of five labels... (original prompt)\nDiscounted gift cards are never MONEYMAKERS: a discount requires spending.",
+      "what_changed": "Added an explicit rule that discounted gift cards are not moneymakers.",
+      "why": "The classifier labels gift-card discounts as MONEYMAKER because the % savings looks like profit."
+    },
+    "set_classifier_prompt": "Prompt updated in memory. Run eval to test it, then call save_classifier_prompt to persist.",
+    "save_classifier_prompt": "Prompt saved to config/prompts/post_classifier.yaml.",
+    "record_improvement_attempt": "Recorded iteration 1 (accepted) to improvement_history.json."
+  },
+  "expect": {
+    "tools_called": ["run_eval_split", "get_classifier_prompt", "propose_prompt_improvement", "set_classifier_prompt", "record_improvement_attempt", "save_classifier_prompt"],
+    "call_counts": {"run_eval_split": [4, 6], "save_classifier_prompt": [1, 1]},
+    "tool_args": [
+      {"tool": "record_improvement_attempt", "args_contain": {"accepted": true}}
+    ],
+    "response_contains": ["accepted"]
+  }
+}

@@ -34,6 +34,7 @@ class Preferences(BaseModel):
 class UserProfile(BaseModel):
     state: str
     zip_code: str
+    has_business: bool = False
     existing_accounts: list[str] = []
     existing_credit_cards: list[str] = []
     churning_cooldowns: list[ChurningCooldown] = []
@@ -43,6 +44,7 @@ class UserProfile(BaseModel):
         p = self.preferences
         lines = [
             f"Location: {self.state} (zip {self.zip_code})",
+            f"Has a business: {self.has_business}",
             f"Existing bank accounts: {', '.join(self.existing_accounts) or 'none'}",
             f"Credit cards held: {', '.join(self.existing_credit_cards) or 'none'}",
             f"Minimum profit threshold: ${p.min_profit_threshold:.0f}",
@@ -81,6 +83,7 @@ def _load_from(path: Path) -> UserProfile:
     return UserProfile(
         state=personal["state"],
         zip_code=str(personal["zip_code"]),
+        has_business=bool(personal.get("has_business", False)),
         existing_accounts=[a.lower() for a in banking.get("existing_accounts", [])],
         existing_credit_cards=[c.lower() for c in banking.get("existing_credit_cards", [])],
         churning_cooldowns=[

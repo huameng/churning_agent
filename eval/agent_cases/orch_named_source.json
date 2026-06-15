@@ -1,0 +1,14 @@
+{
+  "name": "orch_named_source",
+  "agent": "churning_agent",
+  "description": "A named source ('check swagbucks') runs only that agent.",
+  "user_message": "Check swagbucks for new moneymakers.",
+  "tool_responses": {
+    "swagbucks_agent": "MONEYMAKERS:\n- Chime signup + direct deposit | 15000 SB | ~$150 | quick signup, no spend required"
+  },
+  "expect": {
+    "tools_called": ["swagbucks_agent"],
+    "tools_not_called": ["doc_agent", "topcashback_agent", "improvement_agent"],
+    "response_contains": ["Chime"]
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "doc_uncertain_question",
+  "agent": "doc_agent",
+  "description": "An UNCERTAIN classification: surfaces the question in the QUESTIONS section instead of pausing, and still advances last_seen.",
+  "user_message": "Find new MONEYMAKERS.",
+  "tool_responses": {
+    "get_last_seen_url": "https://www.doctorofcredit.com/chase-300-checking-bonus/",
+    "fetch_posts": [
+      [
+        {"title": "Amex Gold 90k Upgrade Offer", "url": "https://www.doctorofcredit.com/amex-gold-90k-upgrade-offer/", "date": "2026-06-11"},
+        {"title": "Chase $300 Checking Bonus", "url": "https://www.doctorofcredit.com/chase-300-checking-bonus/", "date": "2026-06-10"}
+      ]
+    ],
+    "fetch_and_classify": {
+      "key_arg": "url",
+      "cases": {
+        "https://www.doctorofcredit.com/amex-gold-90k-upgrade-offer/": {
+          "label": "UNCERTAIN",
+          "reasoning": "Value depends on whether the user already holds an Amex Gold card.",
+          "estimated_value": null,
+          "question": "Do you currently have an Amex Gold card?",
+          "title": "Amex Gold 90k Upgrade Offer",
+          "url": "https://www.doctorofcredit.com/amex-gold-90k-upgrade-offer/"
+        }
+      },
+      "default": {"label": "IRRELEVANT", "reasoning": "Not an offer.", "estimated_value": null, "question": null}
+    },
+    "set_last_seen_url": "Last seen URL updated."
+  },
+  "expect": {
+    "tools_called": ["get_last_seen_url", "fetch_posts", "fetch_and_classify", "set_last_seen_url"],
+    "response_contains": ["QUESTIONS", "Amex Gold"]
+  }
+}

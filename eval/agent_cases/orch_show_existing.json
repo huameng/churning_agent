@@ -1,0 +1,13 @@
+{
+  "name": "orch_show_existing",
+  "agent": "churning_agent",
+  "description": "'Show me' is a read of already-found opportunities: answers with one run_query SELECT, never re-runs the source agents.",
+  "user_message": "Show me my moneymakers.",
+  "tool_responses": {
+    "run_query": "Rendered 4 row(s) to the user."
+  },
+  "expect": {
+    "tools_called": ["run_query"],
+    "tools_not_called": ["doc_agent", "topcashback_agent", "swagbucks_agent", "improvement_agent"]
+  }
+}

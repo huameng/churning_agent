@@ -1,0 +1,16 @@
+{
+  "name": "portal_login_blocked",
+  "agent": "topcashback_agent",
+  "description": "Login hits a captcha: an orchestrated site agent must report the blocker as text (it has no ask_human) and must not record offers or keep driving the page.",
+  "user_message": "Check topcashback for new MONEYMAKERS.",
+  "tool_responses": {
+    "portal_login": "LOGIN BLOCKED: topcashback is showing a captcha — a human must complete login manually in the browser profile.",
+    "list_offers": "Not logged in — offers page redirected to the login screen.",
+    "observe_page": "Login page with a captcha challenge. No offer elements visible."
+  },
+  "expect": {
+    "tools_called": ["portal_login"],
+    "tools_not_called": ["note_offer", "click_element", "fill_field"],
+    "response_contains": ["captcha"]
+  }
+}

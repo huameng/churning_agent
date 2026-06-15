@@ -1,0 +1,128 @@
+[
+  {
+    "title": "[Targeted] AmEx Offer: Get Up To $2,400 Back on U.S. Electronic Goods and Software Purchases",
+    "url": "https://www.doctorofcredit.com/targeted-amex-offer-get-up-to-2400-back-on-u-s-electronic-goods-and-software-purchases/",
+    "content": "The Offer\nCheck your AmEx Offers for one of the following deals, valid through 8/31/26:\nSpend $4,000 or more on U.S. Electronic Goods and Software Purchases and earn $100 back. Can be done up to 3 times (total of $300).\nSpend $16,000 or more on U.S. Electronic Goods and Software Purchases and earn $400 back. Can be done up to 3 times (total of $1,200).\nSpend $35,000 or more on U.S. Electronic Goods and Software Purchases and earn $800 back. Can be done up to 3 times (total of $2,400).",
+    "expected": "MONEYMAKER",
+    "got": "WORTHLESS",
+    "model_reasoning": "2% back / $2400 on required spend isn't worth pursuing (need >=50% AND >=$25). This is a targeted AmEx offer that provides up to $2,400 back on eligible electronic goods and software purchases across multiple spending tiers.",
+    "human_reasoning": null
+  },
+  {
+    "title": "AT&T Wireless: Switch & Get 25,000 American Airline Miles (60 Days Service Required)",
+    "url": "https://www.doctorofcredit.com/att-wireless-switch-get-15000-american-airline-miles-60-days-service-required/",
+    "content": "The Offer\nDirect link to offer\nAmerican Airlines is offering 15,000 miles when you switch to AT&T wireless",
+    "expected": "WORTHLESS",
+    "got": "MONEYMAKER",
+    "model_reasoning": "Direct return ~$150 meets the $25 threshold. This is a promotional offer from American Airlines to receive 15,000 miles for switching to AT&T wireless service, which has a cash-equivalent value of approximately $150.",
+    "human_reasoning": "The est $150 in profit does not compensate for the cost of switching phone lines, which requires a new contract and activation fees. Must always calculate profit as income minus expenses."
+  },
+  {
+    "title": "[MN, WI, MI, WI, FL, GA] Wings Credit Union $500 Checking Bonus + $50 Referral",
+    "url": "https://www.doctorofcredit.com/mn-wi-mi-fl-ga-wings-credit-union-300-checking-bonus/",
+    "content": "The Offer\nDirect link to offer\nWings Credit Union is offering a bonus of up to $500 when you open a new checking account and complete the following requirements:\nUse promo code WINGS26\nEnroll in digital banking & eStatements\nComplete\n15\n10 or more net PIN or signature-based debit card or credit card purchases of $5 or more each\nEstablish recurring qualified payroll direct deposit(s) totaling\nDirect deposit $3,000 monthly to get $300.\nDirect deposit $4,000 monthly to get $400.\nDirect deposit $5,000 monthly to get $500.",
+    "expected": "IRRELEVANT",
+    "got": "MONEYMAKER",
+    "model_reasoning": "Direct return ~$500 meets the $25 threshold. Wings Credit Union offers a $500 bonus for opening a new checking account, completing debit/credit card purchases, and setting up specific monthly direct deposits in eligible states.",
+    "human_reasoning": "\"Florida: Brevard, Lake, Orange, Osceola, Polk, Seminole, Volusia\" this wasn't in the \"The Offer\" section so I can't be mad, but I'm not in those counties."
+  },
+  {
+    "title": "(Targeted) AmEx Offers: Get $49 Off Walmart+ Annual Membership",
+    "url": "https://www.doctorofcredit.com/amex-offers-get-40-off-walmart-annual-membership/",
+    "content": "The Offer\nCheck your AmEx Offers for the following deal:\nGet a one-time\n$40\n$49 statement credit by using your enrolled eligible Card to make a single purchase of $98 or more on Walmart+ annual memberships online at Walmart.com/plus by 1/31/2024. See terms.",
+    "expected": "WORTHLESS",
+    "got": "MONEYMAKER",
+    "model_reasoning": "50% back ($49) is substantial cashback. This is a targeted Amex Offer providing a $49 statement credit on a Walmart+ annual membership purchase of $98 or more.",
+    "human_reasoning": "This is not $49 in profit, this is $49 off."
+  },
+  {
+    "title": "Amazon: Three Months Of Standard Audible For Free",
+    "url": "https://www.doctorofcredit.com/amazon-three-months-of-standard-audible-for-free/",
+    "content": "The Offer\nDirect link to offer\n(our affiliate link)\nAmazon is offering three months of standard Audible for free.\nOffer valid through July 15, 2026.",
+    "expected": "MONEYMAKER",
+    "got": "WORTHLESS",
+    "model_reasoning": "Discount 100% / $0 is below thresholds (need >=50% AND >=$25). Amazon is offering three months of standard Audible for free, which represents a 100% discount on the subscription cost.",
+    "human_reasoning": "Free and easy, doable from a computer; counts as a moneymaker even if low value."
+  },
+  {
+    "title": "Amazon Sweepstakes: Get $10,000 Amazon Gift Card (200 Winners)",
+    "url": "https://www.doctorofcredit.com/amazon-sweepstakes-get-10000-amazon-gift-card-20-winners/",
+    "content": "The Offer\nGrocery sweepstakes\n|\nAlexa sweepstakes\n(affiliate links)\nGrocery Sweepstakes: 100 lucky winners will get a $10,000 Amazon gift card. One free entry per person per day; Prime not required. Offer valid from June 2nd through June 22nd, 2026. There are a few drawings throughout June.\nScroll down and \u2018Click to Enroll for Free\u2019\nAlexa Sweepstakes: Set up a deal alert with Alexa for a chance to win a $1,000 Amazon gift card. 100 winners will be selected by Prime Day. Offer valid June 2nd through June 18th, 2026. Limit one entry per person.",
+    "expected": "MONEYMAKER",
+    "got": "WORTHLESS",
+    "model_reasoning": "Net return ~$0 is below the $25 threshold. The offer is a sweepstakes for Amazon gift cards with no guaranteed payout, thus excluding it from net_profit calculations.",
+    "human_reasoning": "Free and easy, doable from a computer; counts as a moneymaker even if low value."
+  },
+  {
+    "title": "[Expired] Tropical Smoothie Cafe: Free 12oz Mango Monsoon Smoothie When You Wear Flip Flops",
+    "url": "https://www.doctorofcredit.com/6-5-tropical-smoothie-cafe-free-12oz-mango-monsoon-smoothie-when-you-wear-flip-flops/",
+    "content": "The Offer\nTropical Smoothie Cafe is offering a free 12oz Mango Monsoon Smoothie when you wear flip flops on nation flip flop day (6/5)",
+    "expected": "IRRELEVANT",
+    "got": "WORTHLESS",
+    "model_reasoning": "Discount 100% / $0 is below thresholds (need >=50% AND >=$25). The offer is an expired promotion providing a free smoothie in-store for customers wearing flip-flops on a specific date.",
+    "human_reasoning": null
+  },
+  {
+    "title": "[OOS][YMMV \u2013 Risky] Samsung: Free Galaxy Tab S10 FE 5G 128GB Tablet",
+    "url": "https://www.doctorofcredit.com/samsung-free-tablets/",
+    "content": "The Offer\nDirect link to offer\nFree tablets via Samsung.",
+    "expected": "IRRELEVANT",
+    "got": "WORTHLESS",
+    "model_reasoning": "Net return ~$0 is below the $25 threshold. The post describes an offer for a free Samsung Galaxy Tab S10 FE 5G, but it is marked as out of stock and risky, with no specific dollar value or financial bonus provided.",
+    "human_reasoning": "Out of stock"
+  },
+  {
+    "title": "Varo Money (Online Bank Account) \u2013 $100-$150 Sign Up Bonus (iOS & Android)",
+    "url": "https://www.doctorofcredit.com/varo-money-online-bank-account-75-sign-up-bonus-ios-android-sharing-referrals-still-a-nono/",
+    "content": "The Offer\nNo direct link to offer, requires a referral. Find a referral\nhere\n.\nVaro Money is offering a bonus of $150\u00a0when you open a new account and complete the following requirements:\nReceive a direct deposit of $500\u00a0or more within the first 45 days",
+    "expected": "MONEYMAKER",
+    "got": "IRRELEVANT",
+    "model_reasoning": "Referral bonus (requires another person); excluded. Varo Money offers a $150 bonus for new accounts via referral when receiving a direct deposit of $500 or more within 45 days.",
+    "human_reasoning": "This is not a referral bonus, this is using a referral. This is a sign up bonus, which is eligible."
+  },
+  {
+    "title": "[750 Points For Existing Users] Marriott Dining: Earn Up To 6,000 Bonus Points (Eat Around Town)",
+    "url": "https://www.doctorofcredit.com/marriott-dining-earn-up-to-6000-bonus-points-eat-around-town/",
+    "content": "The Offer\nDirect link to offer\nMarriott Dining is offering new members a bonus of up to 6,000 points. Bonus is broken down as follows (must be completed within 60 days of account opening):\n1,000 bonus points\nthe first time you spend $30 or more\n2,000 bonus points\nthe second time you spend $30 or more\n3,000 bonus points\nthe third time you spend $30 or more",
+    "expected": "WORTHLESS",
+    "got": "MONEYMAKER",
+    "model_reasoning": "Direct return ~$60 meets the $25 threshold. The offer provides 6,000 Marriott Bonvoy points (valued at approximately $60) for completing three dining transactions of $30 or more within 60 days of joining the Eat Around Town program.",
+    "human_reasoning": "Three dining purchases means this is not free"
+  },
+  {
+    "title": "U.S. Eagle Federal Credit Union $90 Referral Bonus",
+    "url": "https://www.doctorofcredit.com/u-s-eagle-federal-credit-union-90-referral-bonus/",
+    "content": "The Offer\nDirect link to offer\n, don\u2019t share your referrals in the comments below. You can share them\nin this linked post\n.\nU.S. Eagle Federal Credit Union is offering a $90 referral bonus to both parties. To receive the bonus the person signing up must meet\none\nof the following requirements:\nAny checking account with direct deposit\nA share certificate ($1,000 minimum)\nA loan or credit card",
+    "expected": "MONEYMAKER",
+    "got": "IRRELEVANT",
+    "model_reasoning": "Referral bonus (requires another person); excluded. U.S. Eagle Federal Credit Union offers a $90 referral bonus to both the referrer and the new member, provided the new member opens a checking account with direct deposit, a $1,000 share certificate, or a loan/credit card.",
+    "human_reasoning": "Unsure if there are eligibility requirements, but $90 is $90. Says BOTH PARTIES get the $90, so you can sign up with someone else's referal and get paid."
+  },
+  {
+    "title": "Navy Federal Credit Union $200 New Member Bonus",
+    "url": "https://www.doctorofcredit.com/navy-federal-credit-union-200-new-member-bonus/",
+    "content": "The Offer\nDirect link to offer\nNavy Federal Credit Union is offering a $200 bonus when you become a new member and open a new checking account with promo code\nCHK26MJ and complete direct deposit requirements.",
+    "expected": "IRRELEVANT",
+    "got": "MONEYMAKER",
+    "model_reasoning": "Direct return ~$200 meets the $25 threshold. Navy Federal Credit Union offers a $200 bonus for opening a new checking account with the promo code CHK26MJ and meeting direct deposit requirements.",
+    "human_reasoning": "Not eligible."
+  },
+  {
+    "title": "(Update) Credit One Platinum X5 Card Review \u2013 5% Back On Gas, Grocery & More Each Year ($5,000 Cap) \u2013 $95 Annual Fee",
+    "url": "https://www.doctorofcredit.com/credit-one-platinum-premier-review-5-back-on-gas-grocery-more-each-year-5000-cap-95-annual-fee/",
+    "content": "Update 6/1/26:\nCard rebranded as \u2018Credit One Bank Platinum X5 Visa Signature Card\u2019. Details are the same and aren\u2019t really interesting. Just bumping this post since you might hear about the card out there with their new media blitz and Shaq partnership.\nOriginal Post 1/16/20:\nCredit One offers the Platinum Premier Visa card\n, let\u2019s take a look at this card in this mini review.\nContents\n[\nhide\n]\n1\nCard Basics\n2\nOur Verdict\nCard Basics\nAnnual fee of $95\nCard earns 5% on the first $5,000 each year in the following categories:\nGas\nGrocery,\nInternet,\nCable,\nSatellite TV,\nMobile phone service purchases\nCard earns 1% back on all purchase\nOur Verdict\nAssuming you spend $5,000 in just the 5% categories you\u2019d earn $250, but after the $95 annual fee that brings it down to $155 and brings down the effective earn rate to 3.1%. There are other cards that earn at higher rates on\ngas\nand\ngrocery purchases\n. Personally I don\u2019t think this card is worth signing up for at all.",
+    "expected": "IRRELEVANT",
+    "got": "WORTHLESS",
+    "model_reasoning": "Net return ~$0 is below the $25 threshold. This is a credit card product with an annual fee and cashback structure, not a signup bonus or direct cash profit offer.",
+    "human_reasoning": "This is an information post about a rebrand, not a new card offering."
+  },
+  {
+    "title": "Wyndham: Earn 7,500-15,000 Points For Staying 2-4 Consecutive Nights",
+    "url": "https://www.doctorofcredit.com/wyndham-earn-7500-15000-points-for-staying-2-4-consecutive-nights/",
+    "content": "The Offer\nDirect link to offer\nWyndham is offering up to 15,000 in bonus points on stays booked by September 3, 2026 and completed by September 30, 2026.\n2 Consecutive Nights and earn 7,500 Bonus Points\n3 Consecutive Nights and earn 12,500 Bonus Points\n4+ Consecutive Nights and earn 15,000 Bonus Points",
+    "expected": "WORTHLESS",
+    "got": "MONEYMAKER",
+    "model_reasoning": "Direct return ~$150 meets the $25 threshold. The offer provides up to 15,000 bonus points for consecutive night stays, valued at approximately $150 based on a 1 cent per point valuation.",
+    "human_reasoning": "$150 is not enough to be worth 4 nights at a Wyndham hotel."
+  }
+]

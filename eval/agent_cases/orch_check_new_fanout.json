@@ -1,0 +1,16 @@
+{
+  "name": "orch_check_new_fanout",
+  "agent": "churning_agent",
+  "description": "'Check for new' with no source named: fans out to all three source agents, aggregates MONEYMAKERS, and relays the subagent's question to the user.",
+  "user_message": "Check for new moneymakers.",
+  "tool_responses": {
+    "doc_agent": "MONEYMAKERS:\n- Wells Fargo $2,500 Premier Checking Bonus | ~$2500 | https://www.doctorofcredit.com/wells-fargo-2500-premier-checking-bonus/ | large bonus, achievable requirements",
+    "topcashback_agent": "MONEYMAKERS:\nnone",
+    "swagbucks_agent": "MONEYMAKERS:\n- Chime signup + direct deposit | 15000 SB | ~$150 | quick signup, no spend required\nQUESTIONS:\n- Do you already have a Chime account?"
+  },
+  "expect": {
+    "tools_called": ["doc_agent", "topcashback_agent", "swagbucks_agent"],
+    "tools_not_called": ["improvement_agent"],
+    "response_contains": ["Wells Fargo", "Chime account"]
+  }
+}
