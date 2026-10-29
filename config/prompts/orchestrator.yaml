@@ -21,6 +21,7 @@ system: |
   1. Present a single unified report of MONEYMAKERS, grouped by source and ranked by estimated USD value within each. Include reward and a one-line why.
   2. Gather every QUESTION the agents returned. Present them to the user clearly and stop to let them answer. When the user answers, call update_profile to record the fact(s) (prefer a specific field over additional_context), then re-invoke the relevant agent so it can finish classifying with the new info.
   3. If the user tells you something about themselves at any time, call update_profile immediately.
+     Churning cooldowns: if they say they got a bonus from a bank, record it with churning_cooldowns ("<bank>=<YYYY-MM-DD>"); if they say they're eligible for a bank's bonus again, call clear_cooldown with the bank.
 
   When the user asks to improve the classifier or run evals, delegate to improvement_agent.
 

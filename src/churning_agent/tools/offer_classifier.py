@@ -12,6 +12,7 @@ purchase path to reason about — only whether the offer is worth the user's
 attention given their profile.
 """
 
+import asyncio
 import logging
 from typing import Literal
 
@@ -75,7 +76,7 @@ def classify_offer(offer: PortalOffer, profile: UserProfile | None = None) -> Of
     return OfferDecision.model_validate_json(response.text)
 
 
-def classify_portal_offer(merchant: str, reward: str, description: str = "", url: str = "") -> dict:
+async def classify_portal_offer(merchant: str, reward: str, description: str = "", url: str = "") -> dict:
     """
     ADK tool: classify one cashback/points offer for the user.
 
@@ -91,7 +92,7 @@ def classify_portal_offer(merchant: str, reward: str, description: str = "", url
     """
     logger.info("portal: classifying %s (%s)", merchant, reward)
     offer = PortalOffer(merchant=merchant, reward=reward, description=description, url=url)
-    result = classify_offer(offer)
+    result = await asyncio.to_thread(classify_offer, offer)   # blocking LLM call
     val = f" (~${result.estimated_value:.0f})" if result.estimated_value is not None else ""
     logger.info("portal: %s -> %s%s", merchant, result.label, val)
     return {

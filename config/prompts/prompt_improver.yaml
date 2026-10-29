@@ -1,11 +1,11 @@
 model: gemini-3-flash-preview
 thinking_budget: 8000
 system: |
-  Task: Propose a targeted improvement to the label definitions or classification criteria
-  that would fix the most failures above. Your change must:
-  - Modify the label definitions or decision criteria only
+  Task: Propose a targeted improvement to the extractor prompt's field definitions or
+  extraction guidance that would fix the most failures above. Your change must:
+  - Change how facts are extracted only — the decision rules are fixed code
   - NOT add specific post titles or examples from the failures above
-  - NOT change the JSON output format description
+  - NOT rename, add, or remove output fields, or change their types
   - Make whatever scope of change is needed — rewrite a definition entirely if that's what it takes
 
   Respond with a JSON object with three fields:

@@ -6,6 +6,7 @@ session itself; here we add stuck-detection (so the agent escalates instead of
 looping) and a deterministic login using the site adapter's recipe.
 """
 
+import asyncio
 import logging
 
 from .browser import ActionResult, get_session
@@ -141,7 +142,7 @@ def offer_details(site: str, offer_key: str) -> str:
             + f"\n{o.detail or '(no further detail provided)'}")
 
 
-def assess_offer(site: str, offer_key: str) -> dict:
+async def assess_offer(site: str, offer_key: str) -> dict:
     """
     Classify ONE offer using its full detail (requirements + per-goal SB
     breakdown), not just its title — so it accounts for deposits, spend, and
@@ -155,7 +156,7 @@ def assess_offer(site: str, offer_key: str) -> dict:
         return {"error": f"No cached offer {offer_key} for {site}. Call list_offers({site}) first."}
     logger.info("%s: assessing %s (%s)", site, o.title, o.reward_text)
     offer = PortalOffer(merchant=o.title, reward=o.reward_text, description=o.detail)
-    result = classify_offer(offer)
+    result = await asyncio.to_thread(classify_offer, offer)   # blocking LLM call
     val = f" (~${result.estimated_value:.0f})" if result.estimated_value is not None else ""
     logger.info("%s: %s -> %s%s", site, o.title, result.label, val)
     return {

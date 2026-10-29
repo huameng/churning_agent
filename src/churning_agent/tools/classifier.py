@@ -1,12 +1,14 @@
 """
-Post classifier: assigns IRRELEVANT, MONEYMAKER, or WORTHLESS to DoC posts.
+Post classifier: assigns IRRELEVANT, MONEYMAKER, DISCOUNT_MONEYMAKER, WORTHLESS,
+or UNCERTAIN to DoC posts.
 
 The `classify` function is the testable core — call it directly without ADK.
 The `fetch_and_classify` function is the ADK tool wrapper.
 """
 
+import asyncio
 import logging
-from pathlib import Path
+from datetime import date
 from typing import Literal
 
 from dotenv import load_dotenv
@@ -14,7 +16,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel
 
-from .profile import UserProfile, load_profile
+from .profile import ChurningCooldown, UserProfile, load_profile
 from .scraper import fetch_offer_section
 from . import store
 from churning_agent import prompts
@@ -35,13 +37,6 @@ def _get_client() -> genai.Client:
     return _client
 
 
-class Classification(BaseModel):
-    label: Literal["IRRELEVANT", "MONEYMAKER", "DISCOUNT_MONEYMAKER", "WORTHLESS", "UNCERTAIN"]
-    reasoning: str
-    question: str | None = None       # populated only when label=UNCERTAIN
-    estimated_value: float | None = None  # dollars, set for MONEYMAKER, DISCOUNT_MONEYMAKER, and WORTHLESS
-
-
 class Eligibility(BaseModel):
     """Structured offer facts extracted by the LLM. Deliberately profile-free:
     these describe the *offer*, and `_decide` compares them to the user profile
@@ -55,11 +50,23 @@ class Eligibility(BaseModel):
     requires_business_account: bool = False
     requires_branch_visit: bool = False
     requires_credit_pull: bool = False
+    requires_brokerage_account: bool = False
+    direct_deposits_required: int | None = None
+    lookback_months: int | None = None    # "no bonus/account in the past N months"
+    issuer: str | None = None             # bank/issuer behind `brand`, e.g. "Chase"
     brand: str | None = None
     discount_pct: float | None = None
     dollar_savings: float | None = None
     net_profit: float | None = None
     reasoning: str = ""
+
+
+class Classification(BaseModel):
+    label: Literal["IRRELEVANT", "MONEYMAKER", "DISCOUNT_MONEYMAKER", "WORTHLESS", "UNCERTAIN"]
+    reasoning: str
+    question: str | None = None       # populated only when label=UNCERTAIN
+    estimated_value: float | None = None  # dollars, set for MONEYMAKER, DISCOUNT_MONEYMAKER, and WORTHLESS
+    extracted: Eligibility | None = None  # the facts the label was decided from (for evals)
 
 
 # Model id and system prompt live in config/prompts/eligibility_extractor.yaml.
@@ -102,17 +109,19 @@ def _norm_brand(s: str) -> str:
     return s
 
 
-def _brand_held(brand: str | None, profile: UserProfile) -> bool:
-    """Does the user already hold an account/card matching `brand`? Matches on
-    substring either way, or on all brand tokens (>2 chars) appearing in a holding
-    — so "Chase IHG Premier" does not match a plain "chase checking" holding, but
+def _brand_matches(brand: str | None, names: list[str]) -> bool:
+    """Does any of `names` (holdings, excluded banks, ...) match `brand`? Matches on
+    substring either way, or on all brand tokens (>2 chars) appearing in a name
+    — so "Chase IHG Premier" does not match a plain "chase sapphire" holding, but
     "Chase" does. Issuer aliases (Amex/American Express) are normalized first."""
     if not brand:
         return False
     b = _norm_brand(brand)
     tokens = [t for t in b.replace("-", " ").replace(".", " ").split() if len(t) > 2]
-    for holding in profile.existing_accounts + profile.existing_credit_cards:
-        h = _norm_brand(holding)
+    for name in names:
+        h = _norm_brand(name).strip()
+        if not h:
+            continue
         if b in h or h in b:
             return True
         if tokens and all(t in h for t in tokens):
@@ -120,18 +129,41 @@ def _brand_held(brand: str | None, profile: UserProfile) -> bool:
     return False
 
 
-def _decide(elig: Eligibility, profile: UserProfile) -> Classification:
+# Lookback assumed when a post doesn't state one: most bank bonuses exclude
+# anyone who got a bonus within the past 12–24 months.
+_DEFAULT_LOOKBACK_MONTHS = 24
+
+
+def _months_between(earlier: date, later: date) -> int:
+    return (later.year - earlier.year) * 12 + (later.month - earlier.month)
+
+
+def _recent_cooldown(bank: str | None, profile: UserProfile) -> ChurningCooldown | None:
+    """The most recent churning cooldown recorded for `bank`, if any."""
+    matches = [c for c in profile.churning_cooldowns if _brand_matches(bank, [c.bank])]
+    return max(matches, key=lambda c: c.last_bonus_date, default=None)
+
+
+def _decide(elig: Eligibility, profile: UserProfile, today: date | None = None) -> Classification:
     """Deterministic gating: turn extracted offer facts + the user profile into a
-    label. Hard constraints (state, business, card-held, willingness) yield
-    IRRELEVANT; surviving offers get a value-based label."""
+    label. Hard constraints (state, business, excluded bank, already held,
+    willingness, direct deposits, churning cooldown) yield IRRELEVANT; a
+    cooldown the post's terms can't resolve yields UNCERTAIN with a question;
+    surviving offers get a value-based label."""
     p = profile.preferences
     note = elig.reasoning
+    today = today or date.today()
+    bank = elig.issuer or elig.brand
 
-    def out(label: str, value: float | None, why: str) -> Classification:
+    def out(label: str, value: float | None, why: str, question: str | None = None) -> Classification:
         reason = f"{why}." + (f" {note}" if note else "")
-        return Classification(label=label, reasoning=reason[:500], estimated_value=value)
+        return Classification(label=label, reasoning=reason[:500], estimated_value=value,
+                              question=question, extracted=elig)
 
     # --- hard IRRELEVANT gates ---
+    if _brand_matches(bank, p.excluded_banks):
+        return out("IRRELEVANT", None, f"{bank} is on the user's excluded-banks list")
+
     if not elig.nationwide and elig.eligible_states:
         states = {s.strip().upper() for s in elig.eligible_states}
         if profile.state.upper() not in states:
@@ -141,13 +173,31 @@ def _decide(elig: Eligibility, profile: UserProfile) -> Classification:
     if elig.requires_business_account and not profile.has_business:
         return out("IRRELEVANT", None, "Requires a business account; user has no business")
 
-    if elig.offer_type == "spend_offer_existing_card" and not _brand_held(elig.brand, profile):
+    # Bank accounts and cards are checked separately: holding a Chase card does
+    # not rule out a Chase checking bonus, and vice versa.
+    if (elig.offer_type == "spend_offer_existing_card"
+            and not _brand_matches(elig.brand, profile.existing_credit_cards)):
         return out("IRRELEVANT", None,
                    f"Spend offer requires holding {elig.brand}, which the user does not")
 
-    if elig.offer_type in ("new_account_bonus", "new_card_signup") and _brand_held(elig.brand, profile):
+    if (elig.offer_type == "new_account_bonus"
+            and _brand_matches(elig.brand, profile.existing_accounts)):
         return out("IRRELEVANT", None,
-                   f"New-account bonus for {elig.brand}, which the user already holds")
+                   f"New-account bonus for {elig.brand}, which the user already has an account with")
+
+    if (elig.offer_type == "new_card_signup"
+            and _brand_matches(elig.brand, profile.existing_credit_cards)):
+        return out("IRRELEVANT", None,
+                   f"Sign-up bonus for {elig.brand}, which the user already holds")
+
+    if elig.requires_brokerage_account and not p.willing_to_open_brokerage:
+        return out("IRRELEVANT", None, "Requires opening a brokerage account; user is unwilling")
+
+    if (elig.direct_deposits_required is not None
+            and elig.direct_deposits_required > p.max_direct_deposit_required):
+        return out("IRRELEVANT", None,
+                   f"Requires {elig.direct_deposits_required} direct deposits; "
+                   f"user allows at most {p.max_direct_deposit_required}")
 
     if elig.requires_branch_visit and not p.willing_to_visit_branch:
         return out("IRRELEVANT", None, "Requires a branch visit; user is unwilling")
@@ -160,6 +210,26 @@ def _decide(elig: Eligibility, profile: UserProfile) -> Classification:
 
     if elig.offer_type == "informational":
         return out("IRRELEVANT", None, "Informational / non-actionable post")
+
+    # --- churning cooldown (bank bonuses): IRRELEVANT inside a stated lookback,
+    # UNCERTAIN when the post doesn't say and the last bonus was recent ---
+    if elig.offer_type == "new_account_bonus":
+        cooldown = _recent_cooldown(bank, profile)
+        if cooldown is not None:
+            months = _months_between(cooldown.last_bonus_date, today)
+            if elig.lookback_months is not None:
+                if months < elig.lookback_months:
+                    return out("IRRELEVANT", None,
+                               f"Last {bank} bonus was {cooldown.last_bonus_date}, inside the "
+                               f"{elig.lookback_months}-month lookback")
+            elif months < _DEFAULT_LOOKBACK_MONTHS:
+                return out(
+                    "UNCERTAIN", None,
+                    f"Last {bank} bonus was {cooldown.last_bonus_date} ({months} months ago) "
+                    f"and the post doesn't state a lookback window",
+                    question=(f"You last got a {bank} bonus on {cooldown.last_bonus_date}. "
+                              f"Are you eligible for a new {bank} bonus yet?"),
+                )
 
     # --- value-based labels for offers that pass every gate ---
     # A retail discount is judged purely on the discount thresholds.
@@ -238,7 +308,9 @@ async def fetch_and_classify(title: str, url: str) -> dict:
     """
     logger.info("doc: classifying %s", title)
     content = await fetch_offer_section(url, title)
-    result = classify(title, content)
+    # classify() makes a blocking LLM call; keep it off the event loop so
+    # concurrently running site agents aren't stalled.
+    result = await asyncio.to_thread(classify, title, content)
     val = f" (~${result.estimated_value:.0f})" if result.estimated_value is not None else ""
     logger.info("doc: %s -> %s%s", title, result.label, val)
     if result.label != "UNCERTAIN":

@@ -32,7 +32,7 @@
       "why": "Both training failures involved gift cards."
     },
     "set_classifier_prompt": "Prompt updated in memory. Run eval to test it, then call save_classifier_prompt to persist.",
-    "save_classifier_prompt": "Prompt saved to config/prompts/post_classifier.yaml.",
+    "save_classifier_prompt": "Prompt saved to config/prompts/eligibility_extractor.yaml.",
     "record_improvement_attempt": "Recorded iteration 1 (rejected) to improvement_history.json."
   },
   "expect": {

@@ -122,6 +122,10 @@ def update_profile(field: str, value: str) -> str:
       min_profit_threshold   — dollar amount as a number (e.g. "50")
       min_discount_pct       — minimum % off for DISCOUNT_MONEYMAKER (e.g. "50")
       min_discount_savings   — minimum $ savings for DISCOUNT_MONEYMAKER (e.g. "25")
+      max_direct_deposit_required — most direct deposits the user will set up (e.g. "2")
+      churning_cooldowns     — "<bank>=<YYYY-MM-DD>": the user got a bonus from <bank> on
+                               that date (replaces any earlier date for that bank)
+      clear_cooldown         — bank name: the user is eligible for that bank's bonuses again
 
     Returns a confirmation string describing what changed.
     """
@@ -170,12 +174,41 @@ def update_profile(field: str, value: str) -> str:
                 msg = f"Set {field} to {float(value)}."
             except ValueError:
                 return f"Error: {field} must be a number, got '{value}'."
+        elif field == "max_direct_deposit_required":
+            try:
+                prefs[field] = int(value)
+                msg = f"Set {field} to {int(value)}."
+            except ValueError:
+                return f"Error: {field} must be a whole number, got '{value}'."
+        elif field == "churning_cooldowns":
+            bank, sep, when = value.partition("=")
+            bank = bank.strip().lower()
+            try:
+                when_date = date.fromisoformat(when.strip())
+            except ValueError:
+                when_date = None
+            if not sep or not bank or when_date is None:
+                return f"Error: {field} must look like 'chase=2026-05-01', got '{value}'."
+            cooldowns = [c for c in banking.get(field) or [] if c["bank"].lower() != bank]
+            cooldowns.append({"bank": bank, "last_bonus_date": when_date.isoformat()})
+            banking[field] = cooldowns
+            msg = f"Recorded a {bank} bonus on {when_date.isoformat()}."
+        elif field == "clear_cooldown":
+            bank = value.lower()
+            cooldowns = banking.get("churning_cooldowns") or []
+            kept = [c for c in cooldowns if c["bank"].lower() != bank]
+            if len(kept) == len(cooldowns):
+                msg = f"No cooldown recorded for '{value}', no change."
+            else:
+                banking["churning_cooldowns"] = kept
+                msg = f"Cleared the {bank} cooldown."
         else:
             return (
                 f"Error: unknown field '{field}'. Supported: "
                 "existing_accounts, existing_credit_cards, excluded_banks, additional_context, "
                 "willing_to_visit_branch, willing_to_open_brokerage, willing_to_do_credit_pull, "
-                "min_profit_threshold, min_discount_pct, min_discount_savings."
+                "min_profit_threshold, min_discount_pct, min_discount_savings, "
+                "max_direct_deposit_required, churning_cooldowns, clear_cooldown."
             )
 
         with open(path, "w") as f:

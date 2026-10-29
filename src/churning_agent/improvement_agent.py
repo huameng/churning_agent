@@ -3,8 +3,15 @@ Self-improvement subagent for the classifier.
 
 Exposed as AgentTool to the root agent so the user can say
 "run evals and improve yourself".
+
+The DoC classifier is two stages: an LLM extracts offer facts using the
+eligibility_extractor prompt, then fixed rules (classifier._decide) turn those
+facts into a label. Only the extractor prompt is tunable, so that is the prompt
+this agent edits; the proposer is shown the rules' source so it can tell an
+extraction mistake (fixable here) from a rule mistake (needs a code change).
 """
 
+import inspect
 import json
 import logging
 from collections import defaultdict
@@ -17,6 +24,7 @@ from google.genai import types
 
 from churning_agent import prompts
 from churning_agent.llm import retry_transient, retrying_model
+from churning_agent.tools import classifier
 from churning_agent.tools.classifier import _get_client
 from churning_agent.eval.eval_classifier import evaluate_samples, _RESULTS_DIR
 from churning_agent.eval.improve_classifier import (
@@ -36,8 +44,9 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 logger = logging.getLogger(__name__)
 
-# The classifier whose prompt this agent tunes (config/prompts/post_classifier.yaml).
-_CLASSIFIER_PROMPT = "post_classifier"
+# The prompt this agent tunes: the DoC classifier's fact extractor
+# (config/prompts/eligibility_extractor.yaml).
+_CLASSIFIER_PROMPT = "eligibility_extractor"
 
 
 # ---------------------------------------------------------------------------
@@ -80,6 +89,7 @@ def _enrich_failures(failures: list, cases: list) -> list:
             "got": f["got"],
             "model_reasoning": f["model_reasoning"],
             "human_reasoning": f.get("human_reasoning"),
+            "extracted": f.get("extracted"),
             "content_snippet": content_by_url.get(f.get("url"), "")[:300],
         }
         for f in failures
@@ -132,13 +142,14 @@ def run_eval_split(split: str) -> dict:
 
 
 def get_classifier_prompt() -> str:
-    """Return the current classifier system prompt."""
+    """Return the current classifier prompt (the eligibility extractor's system prompt)."""
     return prompts.load(_CLASSIFIER_PROMPT).system
 
 
 def set_classifier_prompt(new_prompt: str) -> str:
     """
-    Replace the classifier system prompt in memory only — does NOT write to disk.
+    Replace the classifier prompt (the eligibility extractor's system prompt) in
+    memory only — does NOT write to disk.
     Use this to test a proposed change before committing.
 
     Args:
@@ -154,7 +165,7 @@ def save_classifier_prompt() -> str:
     Call this only after verifying the new prompt improves eval metrics.
     """
     prompts.save_system(_CLASSIFIER_PROMPT, prompts.load(_CLASSIFIER_PROMPT).system)
-    return "Prompt saved to config/prompts/post_classifier.yaml."
+    return f"Prompt saved to config/prompts/{_CLASSIFIER_PROMPT}.yaml."
 
 
 @retry_transient
@@ -173,8 +184,9 @@ def _propose(meta_prompt: str, model: str, thinking_budget: int | None) -> str:
 
 def propose_prompt_improvement(failures: list) -> dict:
     """
-    Ask Gemini to propose an improvement to the classifier prompt based on failures.
-    Receives titles, model/human reasonings, AND a content snippet for each failure.
+    Ask Gemini to propose an improvement to the extractor prompt based on failures.
+    Receives titles, model/human reasonings, the facts the extractor pulled out,
+    AND a content snippet for each failure.
 
     Args:
         failures: List of failure dicts from run_eval_split, including content_snippet.
@@ -199,6 +211,8 @@ def propose_prompt_improvement(failures: list) -> dict:
             entry = f'- Title: "{f["title"]}"'
             if f.get("content_snippet"):
                 entry += f'\n  Offer text: {f["content_snippet"]}'
+            if f.get("extracted"):
+                entry += f'\n  Extracted facts: {json.dumps(f["extracted"])}'
             entry += f'\n  Model reasoning: {f["model_reasoning"]}'
             if f.get("human_reasoning"):
                 entry += f'\n  Human note: {f["human_reasoning"]}'
@@ -215,17 +229,26 @@ def propose_prompt_improvement(failures: list) -> dict:
         )
 
     cfg = prompts.load("prompt_improver")
-    meta_prompt = f"""You are improving a classifier system prompt. The classifier assigns one of five
-labels (IRRELEVANT, MONEYMAKER, DISCOUNT_MONEYMAKER, WORTHLESS, UNCERTAIN) to Doctor of Credit blog posts.
+    meta_prompt = f"""You are improving the prompt of a two-stage classifier that labels Doctor of Credit
+blog posts IRRELEVANT, MONEYMAKER, DISCOUNT_MONEYMAKER, WORTHLESS, or UNCERTAIN.
 
-Current system prompt:
+Stage 1 is an LLM that extracts structured offer facts from the post using the prompt below.
+Stage 2 is fixed Python code that turns those facts plus the user's profile into the label:
+---
+{_DECISION_RULES}
+---
+
+Current extractor prompt (the ONLY thing you may change):
 ---
 {current_prompt}
 ---
 
 The classifier made the following mistakes on the training set, grouped by mistake type.
-Each entry includes the post title, a snippet of the actual offer text, the model's reasoning,
-and a human annotation where available (human annotations are high-signal — prioritise them).
+Each entry includes the post title, a snippet of the actual offer text, the facts the extractor
+pulled out, the reasoning, and a human annotation where available (human annotations are
+high-signal — prioritise them). For each failure, work out which extracted fact was wrong;
+if the facts were right and the rules produced the wrong label, the prompt cannot fix it —
+leave it alone and say so in "why".
 {annotation_note}
 Failures:
 {failure_block}
@@ -304,6 +327,11 @@ def get_improvement_history() -> dict:
         "history_path": str(_HISTORY_PATH),
         "entries": entries,
     }
+
+
+# Shown to the proposer so it knows how extracted facts become labels. Read from
+# the source so it can't drift from the rules actually applied.
+_DECISION_RULES = inspect.getsource(classifier._decide)
 
 
 # ---------------------------------------------------------------------------

@@ -82,3 +82,25 @@ def test_update_refreshes_cache(cfg):
     profile.load_profile(cfg)                       # prime the cache
     profile.update_profile("excluded_banks", "wells fargo")
     assert "wells fargo" in profile.load_profile(cfg).preferences.excluded_banks
+
+
+def test_update_max_direct_deposits(cfg):
+    assert "Set max_direct_deposit_required to 1" in profile.update_profile("max_direct_deposit_required", "1")
+    assert _read(cfg)["banking"]["preferences"]["max_direct_deposit_required"] == 1
+    assert "whole number" in profile.update_profile("max_direct_deposit_required", "1.5")
+
+
+def test_update_cooldown_adds_replaces_and_clears(cfg):
+    assert "Recorded" in profile.update_profile("churning_cooldowns", "Chase=2026-01-01")
+    profile.update_profile("churning_cooldowns", "chase=2026-05-01")
+    assert profile.load_profile(cfg).churning_cooldowns[0].last_bonus_date.isoformat() == "2026-05-01"
+    assert len(_read(cfg)["banking"]["churning_cooldowns"]) == 1
+
+    assert "Cleared" in profile.update_profile("clear_cooldown", "Chase")
+    assert profile.load_profile(cfg).churning_cooldowns == []
+    assert "no change" in profile.update_profile("clear_cooldown", "chase")
+
+
+def test_update_cooldown_validates(cfg):
+    assert "must look like" in profile.update_profile("churning_cooldowns", "chase")
+    assert "must look like" in profile.update_profile("churning_cooldowns", "chase=last spring")

@@ -87,6 +87,7 @@ def run_eval(samples: list[dict], stop_on_unexpected: bool = False) -> int:
             "estimated_value": result.estimated_value,
             "model_reasoning": result.reasoning,
             "human_reasoning": sample.get("human_reasoning"),
+            "extracted": _extracted(result),
         })
 
         if expected and result.label != expected and stop_on_unexpected:
@@ -219,7 +220,7 @@ def _print_metrics(metrics: dict) -> None:
 
 def _write_failures(failures: list[dict]) -> Path:
     """Overwrite eval/failures.json with the latest set of failed cases, ready for correction."""
-    path = Path(__file__).parent / "failures.json"
+    path = _EVAL_DIR / "failures.json"
     annotated = [
         {
             "title": f["title"],
@@ -229,6 +230,7 @@ def _write_failures(failures: list[dict]) -> Path:
             "got": f["got"],
             "model_reasoning": f["model_reasoning"],
             "human_reasoning": f.get("human_reasoning"),
+            "extracted": f.get("extracted"),
         }
         for f in failures
     ]
@@ -251,6 +253,12 @@ def _write_results(run_at: str, cases: list[dict], passed: int, failed: int, ski
         encoding="utf-8",
     )
     return path
+
+
+def _extracted(result) -> dict | None:
+    """The facts a two-stage classifier decided from, if it exposes them."""
+    facts = getattr(result, "extracted", None)
+    return facts.model_dump() if facts is not None else None
 
 
 def _post_classify(sample: dict):
@@ -283,6 +291,7 @@ def evaluate_samples(samples: list[dict], classify_fn=_post_classify) -> tuple[d
             "outcome": outcome,
             "model_reasoning": result.reasoning,
             "human_reasoning": sample.get("human_reasoning"),
+            "extracted": _extracted(result),
         })
 
     confusion = _confusion_matrix(case_results)

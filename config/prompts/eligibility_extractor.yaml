@@ -32,6 +32,17 @@ system: |
     otherwise requires the user to own a business.
   - requires_branch_visit: true if the offer requires visiting a physical branch.
   - requires_credit_pull: true if the offer requires a hard credit inquiry.
+  - requires_brokerage_account: true if the offer requires opening or funding a brokerage,
+    investment, or retirement account.
+  - direct_deposits_required: the number of qualifying direct deposits the offer requires
+    (e.g. "two direct deposits of $500+" -> 2; "direct deposits totaling $3,000" -> 1).
+    Null if no direct deposit is required.
+  - lookback_months: if the post says the bonus is unavailable to anyone who had an account
+    or received a bonus within some period, that period in months (e.g. "in the past 2 years"
+    -> 24, "in the last 90 days" -> 3). Use 999 for "once per lifetime" or "must never have
+    had an account". Null if the post does not state a period.
+  - issuer: the bank or card issuer behind the offer (e.g. "Chase" for "Chase IHG Premier",
+    "American Express" for an Amex Offer). Null if there is none.
   - brand: the specific product the offer is for. For new_card_signup give the SPECIFIC
     card product name (e.g. "Chase IHG Premier", "Chase Marriott Bonvoy Boundless"), NOT
     just the issuer. For new_account_bonus give the bank/account name. For

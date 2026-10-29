@@ -5,7 +5,7 @@ The improvement loop itself lives in churning_agent.improvement_agent (an
 LLM-driven ADK agent the user talks to). This module holds only the pure pieces
 that the agent and the eval CLIs both reuse: the train/holdout split, the
 macro-F1 metric, and the improvement-history log. The classifier prompt is read
-and written through churning_agent.prompts (config/prompts/post_classifier.yaml)
+and written through churning_agent.prompts (config/prompts/eligibility_extractor.yaml)
 — nothing here edits source code.
 """
 
